@@ -1,0 +1,21 @@
+import java.util.UUID;
+import kotlinx.datetime.Instant;
+
+CREATE TABLE IF NOT EXISTS note (
+  id TEXT AS UUID PRIMARY KEY NOT NULL,
+  -- NULL is self
+  installation_id TEXT AS UUID REFERENCES installation,
+  text TEXT NOT NULL,
+  created_at TEXT AS Instant NOT NULL,
+  deleted_at TEXT AS Instant DEFAULT NULL
+);
+
+list:
+SELECT * FROM note;
+
+insert:
+INSERT OR REPLACE INTO note (id, installation_id, text, created_at, deleted_at) VALUES ?;
+
+--CREATE TABLE IF NOT EXISTS attachment (
+
+--);

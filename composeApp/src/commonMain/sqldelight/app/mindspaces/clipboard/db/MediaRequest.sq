@@ -1,0 +1,22 @@
+import java.util.UUID;
+import kotlin.Boolean;
+import kotlinx.datetime.Instant;
+
+CREATE TABLE IF NOT EXISTS mediaRequest (
+  id TEXT AS UUID PRIMARY KEY NOT NULL,
+  self INTEGER AS Boolean NOT NULL,
+  media_id TEXT AS UUID NOT NULL,
+  created_at TEXT AS Instant NOT NULL
+);
+
+all:
+SELECT * FROM mediaRequest ORDER BY created_at DESC;
+
+latest:
+SELECT * FROM mediaRequest WHERE self = 0 ORDER BY created_at DESC LIMIT 1;
+
+insert:
+INSERT OR REPLACE INTO mediaRequest (id, self, media_id, created_at) VALUES ?;
+
+delete:
+DELETE FROM mediaRequest WHERE id = ?;

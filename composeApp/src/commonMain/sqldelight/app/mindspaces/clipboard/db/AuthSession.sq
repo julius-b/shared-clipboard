@@ -1,0 +1,36 @@
+import java.util.UUID;
+import kotlinx.datetime.Instant;
+
+CREATE TABLE IF NOT EXISTS authSession (
+  id TEXT AS UUID PRIMARY KEY NOT NULL,
+  account_id TEXT AS UUID NOT NULL,
+  installation_id TEXT AS UUID NOT NULL,
+  ioid TEXT AS UUID NOT NULL,
+  secret_update_id TEXT AS UUID NOT NULL,
+  refresh_token text NOT NULL,
+  access_token text NOT NULL,
+  created_at TEXT AS Instant NOT NULL,
+  deleted_at TEXT AS Instant
+);
+
+insert:
+INSERT OR REPLACE INTO authSession (id, account_id, installation_id, ioid, secret_update_id, refresh_token, access_token, created_at) VALUES ?;
+-- (?, ?, ?, ?, ?, ?, ?, ?)
+
+getLatest:
+SELECT * FROM authSession WHERE created_at = (SELECT max(created_at) FROM authSession) AND deleted_at IS NULL;
+
+getLatestByIOID:
+SELECT * FROM authSession WHERE created_at = (SELECT max(created_at) FROM authSession) AND ioid = :ioid AND deleted_at IS NULL;
+
+-- select rows with maximum values in each group
+-- should return latest auth_session per ioid
+getLatestByDistinctIOID:
+SELECT account_id, ioid, max(created_at) FROM authSession WHERE deleted_at IS NULL GROUP BY ioid;
+
+truncate:
+DELETE FROM authSession;
+
+-- since deleted_at is just TEXT, better to generate this in code
+deleteAll:
+UPDATE authSession SET deleted_at = ?;

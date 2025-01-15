@@ -1,0 +1,28 @@
+import app.mindspaces.clipboard.api.ApiAccountProperty.Type;
+import java.util.UUID;
+import kotlin.Boolean;
+import kotlinx.datetime.Instant;
+
+-- client-side modifications do not allow incomplete fields
+-- only implemented as insert-time checks because the ActorProperty is also used for network response parsing
+CREATE TABLE IF NOT EXISTS accountProperty (
+  id TEXT AS UUID PRIMARY KEY NOT NULL,
+  account_id TEXT AS UUID NOT NULL,
+  installation_id TEXT AS UUID NOT NULL,
+  type TEXT AS Type NOT NULL,
+  content TEXT NOT NULL,
+  verification_code TEXT NOT NULL,
+  valid INTEGER AS Boolean NOT NULL CHECK (type <> 'phone_no' OR valid = 1), -- client-side check
+  "primary" INTEGER AS Boolean CHECK("primary" IS NOT NULL), -- client-side check
+  created_at TEXT AS Instant NOT NULL,
+  deleted_at TEXT AS Instant
+);
+
+insert:
+INSERT OR REPLACE INTO accountProperty(id, account_id, installation_id, type, content, verification_code, valid, "primary", created_at, deleted_at) VALUES ?;
+
+listByActor:
+SELECT * FROM accountProperty WHERE account_id = ?;
+
+truncate:
+DELETE FROM accountProperty;

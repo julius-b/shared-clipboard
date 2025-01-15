@@ -1,0 +1,12 @@
+import java.util.UUID;
+
+-- client only stores receipts of own installation
+CREATE TABLE IF NOT EXISTS mediaReceipt (
+  media_id TEXT AS UUID PRIMARY KEY
+);
+
+insert:
+INSERT OR REPLACE INTO mediaReceipt (media_id) VALUES ?;
+
+delete:
+DELETE FROM mediaReceipt WHERE media_id = ?;

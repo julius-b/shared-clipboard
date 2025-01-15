@@ -1,0 +1,106 @@
+import app.mindspaces.clipboard.api.MediaType;
+import app.mindspaces.clipboard.db.ThumbState;
+import java.util.UUID;
+import kotlin.Boolean;
+import kotlinx.datetime.Instant;
+
+-- `File` already taken
+-- TODO iid null = self
+CREATE TABLE IF NOT EXISTS media (
+  id TEXT AS UUID PRIMARY KEY NOT NULL,
+  path TEXT NOT NULL,
+  dir TEXT NOT NULL,
+  cre INTEGER,
+  mod INTEGER NOT NULL,
+  size INTEGER NOT NULL,
+  -- TODO DEFAULT ThumbState.Pending
+  thumbState TEXT AS ThumbState NOT NULL,
+  synced INTEGER AS Boolean NOT NULL DEFAULT 0,
+  thumbRetryCount INTEGER NOT NULL DEFAULT 0,
+  retryCount INTEGER NOT NULL DEFAULT 0,
+  -- android only
+  mediaType TEXT AS MediaType,
+  installation_id TEXT AS UUID,
+  created_at TEXT AS Instant NOT NULL,
+  deleted_at TEXT AS Instant DEFAULT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS media_path_idx ON media (path, cre, mod, size) WHERE installation_id IS NULL AND deleted_at IS NULL;
+
+get:
+SELECT * FROM media WHERE id = ?;
+
+-- used for local updates
+markThumb:
+UPDATE media SET thumbState = ? WHERE installation_id IS NULL AND path = ? AND cre = ? AND mod = ? AND size = ?;
+
+-- used for local updates
+markAsSynced:
+UPDATE media SET synced = 1 WHERE installation_id IS NULL AND path = ? AND cre = ? AND mod = ? AND size = ?;
+
+-- TODO upload might be running at the same time as a change is detected
+-- save 'outstanding' with path, cre, mod, size, and delete that sepcific 'outstanding'
+-- after doing something, delete might fail, meaning that what was done is now outdated, but oh well :)
+-- requirements:
+-- - while the upload is occuring,
+
+getLocal:
+SELECT * FROM media WHERE installation_id IS NULL AND path = ? AND cre = ? AND mod = ? AND size = ?;
+
+list:
+SELECT * FROM media ORDER BY mod DESC;
+
+-- TODO hasprefix (clickig on parent dir also shows all from subdir) vs dir==dir
+files:
+SELECT * FROM media WHERE dir = ? ORDER BY mod DESC;
+
+directories:
+SELECT outer.*
+FROM media AS outer
+JOIN (
+    SELECT dir, MAX(mod) AS max_mod
+    FROM media
+    GROUP BY dir
+) AS inner
+ON outer.dir = inner.dir AND outer.mod = inner.max_mod
+ORDER BY outer.mod DESC;
+-- slow:
+-- SELECT *
+-- FROM media AS outer
+-- WHERE id = (
+--     SELECT id
+--     FROM media AS inner
+--     WHERE outer.dir = inner.dir
+--     ORDER BY mod DESC
+--     LIMIT 1
+-- );
+-- non-unique mod:
+--SELECT * FROM media outer WHERE outer.mod = (
+--  SELECT max(mod) FROM media inner WHERE outer.dir = inner.dir
+--);
+
+-- TODO enum syntax, IN
+recents:
+SELECT * FROM media WHERE (thumbState = ? OR thumbState = ?) ORDER BY mod DESC LIMIT 16;
+
+recentsNotFailed:
+SELECT * FROM media WHERE thumbState <> ? ORDER BY mod DESC LIMIT 16;
+
+-- TODO pendingThumb, unsyncedThumb - with thumb_state = ThumbState.<>
+byThumbState:
+SELECT * FROM media WHERE installation_id IS NULL AND thumbState = ? ORDER BY mod DESC LIMIT 1;
+
+-- TODO by media_id should be fine
+increaseThumbRetry:
+UPDATE media SET thumbRetryCount = thumbRetryCount + 1 WHERE installation_id IS NULL AND path = ? AND cre = ? AND mod = ? AND size = ?;
+
+resetThumbRetryCounter:
+UPDATE media SET thumbRetryCount = 0 WHERE installation_id IS NULL AND path = ? AND cre = ? AND mod = ? AND size = ?;
+
+-- TODO default for enum
+--insert:
+--INSERT OR REPLACE INTO media (id, path, cre, mod, size, installation_id, created_at) VALUES ?;
+
+--insertFromRemote:
+insert:
+INSERT OR REPLACE INTO media (id, path, dir, cre, mod, size, thumbState, synced, mediaType, installation_id, created_at) VALUES ?;

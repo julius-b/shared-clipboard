@@ -1,0 +1,36 @@
+import app.mindspaces.clipboard.api.ApiAccount.Auth;
+import app.mindspaces.clipboard.api.ApiAccount.Type;
+import java.util.UUID;
+import kotlinx.datetime.Instant;
+
+CREATE TABLE IF NOT EXISTS account (
+  id TEXT AS UUID PRIMARY KEY NOT NULL,
+  type TEXT AS Type NOT NULL,
+  auth TEXT AS Auth NOT NULL,
+  handle TEXT NOT NULL,
+  name TEXT NOT NULL,
+  desc TEXT,
+  -- secret TEXT NOT NULL,
+  profile_id TEXT AS UUID,
+  banner_id TEXT AS UUID,
+  created_at TEXT AS Instant NOT NULL,
+  deleted_at TEXT AS Instant
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS account_handle_unique_nocase_idx ON account (handle COLLATE NOCASE) WHERE deleted_at IS NULL;
+
+insert:
+INSERT OR REPLACE INTO account(id, type, auth, handle, name, desc, profile_id, banner_id, created_at, deleted_at) VALUES ?;
+
+getById:
+SELECT * FROM account WHERE id = ? AND deleted_at IS NULL;
+
+getByHandle:
+SELECT * FROM account WHERE handle = ? AND deleted_at IS NULL;
+
+-- note: only authSession for self is stored locally
+getSelf:
+SELECT * FROM account WHERE id = (SELECT account_id FROM authSession LIMIT 1);
+
+truncate:
+DELETE FROM account;

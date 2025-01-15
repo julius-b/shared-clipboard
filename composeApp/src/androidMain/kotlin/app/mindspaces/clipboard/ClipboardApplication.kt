@@ -1,0 +1,27 @@
+package app.mindspaces.clipboard
+
+import android.app.Application
+import androidx.work.Configuration
+import app.mindspaces.clipboard.di.AndroidApplicationComponent
+import app.mindspaces.clipboard.di.create
+import ca.gosyer.appdirs.impl.attachAppDirs
+
+class ClipboardApplication : Application(), Configuration.Provider {
+
+    val component: AndroidApplicationComponent by lazy {
+        AndroidApplicationComponent.create(this)
+    }
+    //val component = AndroidApplicationComponent::class.create(this)
+
+    init {
+        // TODO possible race with component lazy access?
+        attachAppDirs()
+        // force init InstallationRepo, it doesn't happen otherwise
+        println("init: ${component.installationRepository}")
+    }
+
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder()
+            .setWorkerFactory(component.workerFactory)
+            .build()
+}

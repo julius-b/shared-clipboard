@@ -1,0 +1,23 @@
+<configuration>
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{YYYY-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+    <root level="trace">
+        <appender-ref ref="STDOUT"/>
+    </root>
+    <logger name="org.eclipse.jetty" level="INFO"/>
+    <logger name="io.netty" level="INFO"/>
+
+    <!-- disable constant logging of the full routing table -->
+    <logger name="io.ktor.server.routing.Routing" level="DEBUG"/>
+
+    <!-- disable constant logging of ping frames -->
+    <logger name="io.ktor.websocket.WebSocket" level="DEBUG"/>
+
+    <!-- more chatter -->
+    <logger name="i.k.server.engine.DefaultTransform" level="DEBUG"/>
+    <logger name="i.k.s.p.c.ContentNegotiation" level="DEBUG"/>
+    <logger name="i.k.s.p.statuspages.StatusPages" level="DEBUG"/>
+</configuration>

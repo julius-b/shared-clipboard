@@ -1,0 +1,51 @@
+import app.mindspaces.clipboard.api.ApiInstallation.Platform;
+import java.util.UUID;
+import kotlin.Boolean;
+import kotlinx.datetime.Instant;
+
+CREATE TABLE IF NOT EXISTS installation (
+  self INTEGER AS Boolean NOT NULL,
+  id TEXT AS UUID PRIMARY KEY NOT NULL, -- TODO BLOB
+  name TEXT NOT NULL,
+  "desc" TEXT NOT NULL,
+  os TEXT AS Platform NOT NULL,
+  client TEXT NOT NULL,
+  created_at TEXT AS Instant NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS installation_self_unique_idx ON installation (self) WHERE self = 1;
+
+all:
+SELECT * FROM installation;
+
+getSelf:
+SELECT * FROM installation WHERE self = 1 LIMIT 1;
+
+insert:
+INSERT OR REPLACE INTO installation (self, id, name, "desc", os, client, created_at) VALUES ?;
+-- TODO RETURNING ?
+
+truncate:
+DELETE FROM installation;
+
+
+CREATE TABLE IF NOT EXISTS installationLink (
+  id TEXT AS UUID PRIMARY KEY NOT NULL,
+  name TEXT,
+  account_id TEXT AS UUID NOT NULL,
+  installation_id TEXT AS UUID NOT NULL,
+  created_at TEXT AS Instant NOT NULL,
+  deleted_at TEXT AS Instant -- used by server
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS installation_link_account_id_installation_id_unique_idx ON installationLink (account_id, installation_id) WHERE deleted_at IS NULL;
+
+-- deleted_at received from server
+insertLink:
+INSERT OR REPLACE INTO installationLink (id, name, account_id, installation_id, created_at, deleted_at) VALUES ?;
+
+allLinks:
+SELECT * FROM installationLink;
+
+truncateLinks:
+DELETE FROM installationLink;

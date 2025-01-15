@@ -1,0 +1,21 @@
+import java.util.UUID;
+import kotlinx.datetime.Instant;
+
+CREATE TABLE IF NOT EXISTS tag (
+  id TEXT AS UUID PRIMARY KEY NOT NULL,
+  name TEXT NOT NULL,
+  created_at TEXT AS Instant NOT NULL,
+  deleted_at TEXT AS Instant
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS tag_name_unique_lower_idx ON tag (name COLLATE NOCASE) WHERE deleted_at IS NULL;
+
+CREATE TABLE IF NOT EXISTS tagging (
+  tag_id TEXT AS UUID REFERENCES tag NOT NULL,
+  entity_id TEXT AS UUID NOT NULL,
+  entity_type INTEGER NOT NULL,
+  created_at TEXT AS Instant NOT NULL,
+  deleted_at TEXT AS Instant
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS tagging_tag_id_entity_id_entity_type_unique_idx ON tagging (tag_id, entity_id, entity_type) WHERE deleted_at IS NULL;

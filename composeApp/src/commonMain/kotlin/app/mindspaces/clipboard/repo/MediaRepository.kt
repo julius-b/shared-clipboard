@@ -1,0 +1,312 @@
+package app.mindspaces.clipboard.repo
+
+import app.cash.sqldelight.TransactionWithoutReturn
+import app.cash.sqldelight.coroutines.asFlow
+import app.cash.sqldelight.coroutines.mapToList
+import app.cash.sqldelight.coroutines.mapToOneOrNull
+import app.mindspaces.clipboard.api.ApiErrorResponse
+import app.mindspaces.clipboard.api.ApiInstallation
+import app.mindspaces.clipboard.api.ApiMedia
+import app.mindspaces.clipboard.api.ApiSuccessResponse
+import app.mindspaces.clipboard.api.MediaType
+import app.mindspaces.clipboard.api.Medias
+import app.mindspaces.clipboard.api.toEntity
+import app.mindspaces.clipboard.db.Database
+import app.mindspaces.clipboard.db.Media
+import app.mindspaces.clipboard.db.MediaReceipt
+import app.mindspaces.clipboard.db.MediaRequest
+import app.mindspaces.clipboard.db.ThumbState
+import co.touchlab.kermit.Logger
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.plugins.resources.get
+import io.ktor.client.plugins.timeout
+import io.ktor.client.request.forms.InputProvider
+import io.ktor.client.request.forms.formData
+import io.ktor.client.request.forms.submitFormWithBinaryData
+import io.ktor.http.Headers
+import io.ktor.http.HttpHeaders
+import io.ktor.http.isSuccess
+import io.ktor.utils.io.streams.asInput
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.datetime.Clock
+import me.tatarka.inject.annotations.Inject
+import software.amazon.lastmile.kotlin.inject.anvil.AppScope
+import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
+import java.io.File
+import java.io.InputStream
+import java.util.UUID
+import kotlin.time.Duration.Companion.seconds
+
+@Inject
+@SingleIn(AppScope::class)
+class MediaRepository(private val db: Database, private val client: HttpClient) {
+    private val log = Logger.withTag("MediaRepo")
+
+    private val mediaQueries = db.mediaQueries
+    private val mediaReceiptQueries = db.mediaReceiptQueries
+    private val mediaRequestQueries = db.mediaRequestQueries
+
+    fun sync() {
+        log.d { "sync - querying roots..." }
+        val roots = File.listRoots()
+        for (root in roots) {
+            log.i { "sync - found root: $root" }
+        }
+    }
+
+    private fun get(id: UUID): Media? {
+        return mediaQueries.get(id).executeAsOneOrNull()
+    }
+
+    // conflate / buffer(capacity = 1)
+    // NOTE: only apply distinctUntilChanged() to the element (ie. after map), not the flow
+    fun pendingThumb() =
+        mediaQueries.byThumbState(ThumbState.Pending).asFlow().conflate()
+            .mapToOneOrNull(Dispatchers.IO)
+            .distinctUntilChanged()
+
+    fun unsyncedThumb() =
+        mediaQueries.byThumbState(ThumbState.Generated).asFlow().conflate()
+            .mapToOneOrNull(Dispatchers.IO)
+            .distinctUntilChanged()
+
+    fun increaseThumbRetry(media: Media) {
+        mediaQueries.increaseThumbRetry(media.path, media.cre, media.mod, media.size)
+    }
+
+    fun markAsThumbGenerated(media: Media) {
+        mediaQueries.markThumb(ThumbState.Generated, media.path, media.cre, media.mod, media.size)
+    }
+
+    fun markAsThumbSynced(media: Media) {
+        mediaQueries.markThumb(ThumbState.Synced, media.path, media.cre, media.mod, media.size)
+        mediaQueries.resetThumbRetryCounter(media.path, media.cre, media.mod, media.size)
+    }
+
+    fun markAsThumbGenerationFailed(media: Media) {
+        mediaQueries.markThumb(ThumbState.GenFailed, media.path, media.cre, media.mod, media.size)
+    }
+
+    fun saveLocal(path: String, mediaType: MediaType?, cre: Long?, mod: Long, size: Long): Media {
+        // TODO cross platform compat!
+        val dir = path.substringBeforeLast('/')
+        val media = new(path, dir, cre, mod, size, mediaType)
+        // TODO returning
+        mediaQueries.insert(media)
+        return media;
+    }
+
+    // TODO accept num
+    fun recents(platform: ApiInstallation.Platform): Flow<List<Media>> {
+        // android UI creates thumbnails ad-hoc
+        if (platform == ApiInstallation.Platform.Android) {
+            return mediaQueries.recentsNotFailed(ThumbState.GenFailed).asFlow()
+                .mapToList(Dispatchers.IO)
+                .distinctUntilChanged()
+        }
+        // desktop UI saves thumbnail files
+        return mediaQueries.recents(ThumbState.Generated, ThumbState.Synced).asFlow()
+            .mapToList(Dispatchers.IO)
+            .distinctUntilChanged()
+    }
+
+    fun all(): Flow<List<Media>> {
+        return mediaQueries.list().asFlow().mapToList(Dispatchers.IO)
+    }
+
+    fun list(dir: String?): Flow<List<Media>> {
+        if (dir == null) {
+            return directories()
+        }
+        println("returning files")
+        return files(dir)
+    }
+
+    fun files(dir: String): Flow<List<Media>> {
+        return mediaQueries.files(dir).asFlow().mapToList(Dispatchers.IO).distinctUntilChanged()
+    }
+
+    // TODO return MediaWithCount
+    fun directories(): Flow<List<Media>> {
+        return mediaQueries.directories().asFlow().mapToList(Dispatchers.IO).distinctUntilChanged()
+    }
+
+    private fun outstandingRequest(): Flow<MediaRequest?> {
+        return mediaRequestQueries.latest().asFlow().mapToOneOrNull(Dispatchers.IO)
+            .distinctUntilChanged()
+    }
+
+    private fun deleteRequest(reqId: UUID) {
+        mediaRequestQueries.delete(reqId)
+    }
+
+    fun allRequests(): Flow<List<MediaRequest>> {
+        return mediaRequestQueries.all().asFlow().mapToList(Dispatchers.IO).distinctUntilChanged()
+    }
+
+    // local uses null, server just shouldn't return files from this installation
+    suspend fun load() {
+        try {
+            val resp = client.get(Medias)
+            if (!resp.status.isSuccess()) {
+                val err = resp.body<ApiErrorResponse>()
+                //return RepoResult.ValidationError(err.errors)
+                return
+            }
+            val success = resp.body<ApiSuccessResponse<List<ApiMedia>>>()
+            val medias = success.data.map(ApiMedia::toEntity)
+            db.transaction {
+                for (media in medias) {
+                    mediaQueries.insert(media)
+                    mediaReceiptQueries.insert(MediaReceipt(media.id))
+                }
+            }
+        } catch (e: Throwable) {
+            log.e(e) { "load - unexpected resp: $e" }
+            //return RepoResult.Empty(false)
+        }
+    }
+
+    suspend fun uploadData(media: Media, isFile: Boolean, reader: InputStream): Boolean {
+        // form field names are ignored by the server, only relevant for path
+        val partName = if (isFile) "file" else "thumb"
+        try {
+            // handle closing
+            reader.use { handledReader ->
+                val parts = formData {
+                    append("path", media.path)
+                    append("dir", media.dir)
+                    media.cre?.let { append("cre", it) }
+                    append("mod", media.mod)
+                    // `InputProvider` adds Content-Length, actual file body
+                    // file variant: `InputProvider(file.length()) { file.inputStream().asInput() }`
+                    append(
+                        partName,
+                        InputProvider { handledReader.asInput() },
+                        Headers.build {
+                            // TODO form-data; dup in body
+                            append(
+                                HttpHeaders.ContentDisposition,
+                                "form-data; name=\"$partName\"; filename=\"$partName\""
+                            )
+                        }
+                    )
+                }
+
+                val resp =
+                    client.submitFormWithBinaryData("/api/v1/medias/${media.id}/$partName", parts) {
+                        timeout {
+                            // effectively prevents HttpRequestTimeoutException for large (even 144MB) uploads
+                            requestTimeoutMillis = 5 * 60 * 1000
+                        }
+                    }
+                if (!resp.status.isSuccess()) {
+                    log.e { "upload-data(stream,$partName) - failed: $resp" }
+                    return false
+                }
+                log.i { "upload-data(stream,$partName) - success: ${media.id}" }
+                return true
+            }
+        } catch (e: Throwable) {
+            log.e(e) { "upload-data(stream,$partName) - unexpected resp: $e" }
+            return false
+        }
+    }
+
+    // handles retries, which might happen when upload fails while rt stays active
+    suspend fun handleRequests() {
+        outstandingRequest().collect { req ->
+            if (req == null) {
+                log.i { "handle-requests - out of work" }
+                return@collect
+            }
+            while (true) {
+                log.i { "handle-requests - req: $req" }
+                val media = get(req.media_id)
+                if (media == null) {
+                    log.e { "handle-requests - unknown media-id: ${req.media_id}, ignoring..." }
+                    deleteRequest(req.id)
+                    break
+                }
+
+                // ignore synced state, if a request was issued, re-upload is fine
+                if (media.installation_id != null) {
+                    log.e { "handle-requests - received illegal media request ${req.id} for ${req.media_id}, ignoring..." }
+                    deleteRequest(req.id)
+                    break
+                }
+
+                log.i { "handle-requests - initiating upload for media-id: ${req.media_id}..." }
+                val inStream: InputStream
+                try {
+                    inStream = File(media.path).inputStream()
+                } catch (e: Throwable) {
+                    log.e { "handle-requests - path not found: ${media.path}, ignoring..." }
+                    // TODO maybe inform client, mark media as deleted
+                    deleteRequest(req.id)
+                    break
+                }
+
+                try {
+                    if (!uploadData(media, true, inStream)) {
+                        // TODO what if too big for upload? don't loop
+                        log.w { "handle-requests - upload failed, assuming temporary..." }
+                        // TODO increase retry
+                        delay(25.seconds)
+                        continue
+                    }
+                } catch (e: Throwable) {
+                    log.e(e) { "handle-requests - upload failed, assuming temporary..." }
+                    delay(25.seconds)
+                    continue
+                }
+
+                log.i { "handle-requests - done, deleting req: $req..." }
+                deleteRequest(req.id)
+                delay(10.seconds)
+                break
+            }
+        }
+    }
+
+    fun localFile(path: String, cre: Long?, mod: Long, size: Long) =
+        mediaQueries.getLocal(path, cre, mod, size).executeAsOneOrNull()
+
+    fun save(media: Media) = mediaQueries.insert(media)
+
+    fun saveRequest(req: MediaRequest) = mediaRequestQueries.insert(req)
+
+    fun tx(block: TransactionWithoutReturn.() -> Unit) {
+        mediaQueries.transaction(body = block)
+    }
+
+    // for locally newly discovered files
+    private fun new(
+        path: String,
+        dir: String,
+        cre: Long?,
+        mod: Long,
+        size: Long,
+        mediaType: MediaType?
+    ) = Media(
+        UUID.randomUUID(),
+        path,
+        dir,
+        cre,
+        mod,
+        size,
+        ThumbState.Pending,
+        false,
+        0,
+        0,
+        mediaType,
+        null,
+        Clock.System.now(),
+        null
+    )
+}
