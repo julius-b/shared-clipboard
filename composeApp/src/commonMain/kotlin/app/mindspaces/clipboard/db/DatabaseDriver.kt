@@ -44,6 +44,7 @@ fun createDatabase(driverFactory: DriverFactory): Database {
             dateAdapter,
             dateAdapter
         ),
+        Clip.Adapter(UUIDAdapter, dateAdapter),
         Installation.Adapter(UUIDAdapter, EnumColumnAdapter(), dateAdapter),
         InstallationLink.Adapter(UUIDAdapter, UUIDAdapter, UUIDAdapter, dateAdapter, dateAdapter),
         Media.Adapter(

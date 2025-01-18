@@ -14,27 +14,9 @@ import com.slack.circuit.foundation.Circuit
 import com.slack.circuit.runtime.presenter.Presenter
 import com.slack.circuit.runtime.ui.Ui
 import io.ktor.client.HttpClient
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.StateFlow
-import me.tatarka.inject.annotations.Inject
 import me.tatarka.inject.annotations.Provides
 import software.amazon.lastmile.kotlin.inject.anvil.AppScope
 import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
-
-@Inject
-@SingleIn(AppScope::class)
-data class SharedState(
-    // only for UI (actual access checks current state before), default true for desktop
-    // TODO probably default false for android, move to per-target like DriverFactory
-    val isStoragePermissionGranted: RepeatableMutableState<Boolean> = RepeatableMutableState(true),
-    val requestStoragePermission: MutableState<Unit> = MutableState(2),
-    // not the best solution
-    // no buffer: UI freezes
-    // TODO replace by channel with policy to drop, text cold boot & share while app already opened
-    val share: MutableState<String> = MutableState(2)
-)
 
 @SingleIn(AppScope::class)
 interface SharedApplicationComponent {
@@ -45,7 +27,6 @@ interface SharedApplicationComponent {
     val authRepository: AuthRepository
     val noteRepository: NoteRepository
     val mediaRepository: MediaRepository
-    val sharedState: SharedState
 
     val presenterFactories: Set<Presenter.Factory>
     val uiFactories: Set<Ui.Factory>
@@ -85,23 +66,5 @@ interface SharedApplicationComponent {
             .addPresenterFactories(presenterFactories)
             .addUiFactories(uiFactories)
             .build()
-    }
-}
-
-data class RepeatableMutableState<T>(private val initialValue: T) {
-    private val _state = MutableStateFlow(initialValue)
-    val state: StateFlow<T> get() = _state
-
-    fun updateState(value: T) {
-        _state.value = value
-    }
-}
-
-data class MutableState<T>(private val replay: Int) {
-    private val _state = MutableSharedFlow<T>(replay = replay)
-    val state: SharedFlow<T> get() = _state
-
-    suspend fun updateState(value: T) {
-        _state.emit(value)
     }
 }

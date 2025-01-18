@@ -1,0 +1,17 @@
+import java.util.UUID;
+import kotlinx.datetime.Instant;
+
+CREATE TABLE IF NOT EXISTS clip (
+  id TEXT AS UUID NOT NULL,
+  text TEXT NOT NULL,
+  created_at TEXT AS Instant NOT NULL
+);
+
+latest:
+SELECT * FROM clip ORDER BY created_at DESC LIMIT 1;
+
+insert:
+INSERT INTO clip (id, text, created_at) VALUES ?;
+
+delete:
+DELETE FROM clip WHERE id = ?;

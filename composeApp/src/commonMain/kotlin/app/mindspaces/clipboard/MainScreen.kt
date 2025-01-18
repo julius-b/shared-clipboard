@@ -46,6 +46,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -64,13 +65,17 @@ import app.mindspaces.clipboard.MainScreen.Event.CreateNote
 import app.mindspaces.clipboard.MainScreen.Event.RequestStoragePermission
 import app.mindspaces.clipboard.MainScreen.Event.ToggleAddNote
 import app.mindspaces.clipboard.MainScreen.Event.ViewAllMedia
+import app.mindspaces.clipboard.data.Permission
+import app.mindspaces.clipboard.data.PermissionState
 import app.mindspaces.clipboard.data.ThumbFetcher
 import app.mindspaces.clipboard.data.ThumbFetcherCoilModel
+import app.mindspaces.clipboard.data.isGranted
+import app.mindspaces.clipboard.data.rememberPermissionState
 import app.mindspaces.clipboard.db.Account
+import app.mindspaces.clipboard.db.Clip
 import app.mindspaces.clipboard.db.InstallationLink
 import app.mindspaces.clipboard.db.Media
 import app.mindspaces.clipboard.db.Note
-import app.mindspaces.clipboard.di.SharedState
 import app.mindspaces.clipboard.parcel.CommonParcelize
 import app.mindspaces.clipboard.repo.AuthRepository
 import app.mindspaces.clipboard.repo.InstallationRepository
@@ -92,9 +97,7 @@ import com.slack.circuit.runtime.Navigator
 import com.slack.circuit.runtime.internal.rememberStableCoroutineScope
 import com.slack.circuit.runtime.presenter.Presenter
 import com.slack.circuit.runtime.screen.Screen
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.format
@@ -107,6 +110,7 @@ import org.jetbrains.compose.resources.Font
 import sharedclipboard.composeapp.generated.resources.Anton_Regular
 import sharedclipboard.composeapp.generated.resources.Res
 import software.amazon.lastmile.kotlin.inject.anvil.AppScope
+import java.util.UUID
 
 const val minSecretSize = 8
 
@@ -117,9 +121,8 @@ data object MainScreen : Screen {
         val notes: List<Note>,
         val devices: List<InstallationLink>,
         val recents: List<Media>,
-        val isAddNoteShowing: Boolean,
-        val isStoragePermissionGranted: Boolean,
-        val addNote: String,
+        val storagePermission: PermissionState,
+        val addNote: AddNoteModal?,
         val getAppDirs: () -> AppDirs,
         val eventSink: (Event) -> Unit
     ) : CircuitUiState
@@ -134,11 +137,19 @@ data object MainScreen : Screen {
     }
 }
 
+data class AddNoteModal(
+    val id: UUID? = null,
+    val initial: String
+) {
+    companion object {
+        fun fromClip(clip: Clip) = AddNoteModal(clip.id, clip.text)
+    }
+}
+
 @CircuitInject(MainScreen::class, AppScope::class)
 @Inject
 class MainPresenter(
     @Assisted private val navigator: Navigator,
-    private val sharedState: SharedState,
     private val authRepository: AuthRepository,
     private val installationRepository: InstallationRepository,
     private val noteRepository: NoteRepository,
@@ -151,55 +162,51 @@ class MainPresenter(
     override fun present(): MainScreen.State {
         val scope = rememberStableCoroutineScope()
 
-        var addNote by rememberRetained { mutableStateOf("") }
-        var isAddNoteShowing by rememberRetained { mutableStateOf(false) }
+        var addNote by rememberRetained { mutableStateOf<AddNoteModal?>(null) }
 
         val self by authRepository.self().collectAsRetainedState(null)
         val devices by installationRepository.allLinks().collectAsRetainedState(listOf())
+        val notes by noteRepository.list().collectAsRetainedState(listOf())
+        val recents by mediaRepository.recents(getPlatform()).collectAsRetainedState(listOf())
 
-        log.i { "perm: ${sharedState.isStoragePermissionGranted} / ${sharedState.isStoragePermissionGranted.state}" }
-        log.i { "mediaRepository: $mediaRepository" }
-        //log.i { "--- $isStoragePermissionGranted" }
+        val storagePermission = rememberPermissionState(Permission.Storage) {
+            log.i { "storage-permission-cb: $it" }
+        }
 
-        val isStoragePermissionGranted by sharedState.isStoragePermissionGranted.state.collectAsRetainedState()
-
-        // TODO consume auth repo .self as state
-        // TODO Lifecycle scope?
-        // never cleared, only collect event once -> TODO android sends clear immediately afterward, this ignores clear and only updates... uhm
-        //val shared by sharedFlow.collectAsRetainedState(null)
+        // TODO
+        // val addNote by noteRepository.latestClip().map { it?.let { AddNoteModal.fromClip(it) } }
+        //            .collectAsRetainedState(null)
         LaunchedEffect(Unit) {
             scope.launch {
-                sharedState.share.state.collectLatest {
-                    log.i { "got share intent: $it" }
-                    isAddNoteShowing = true
-                    addNote = it
+                noteRepository.latestClip().collect { clip ->
+                    if (clip == null) return@collect
+                    log.i { "got share intent: $clip" }
+                    addNote = AddNoteModal.fromClip(clip)
                 }
             }
         }
-
-        val notes by noteRepository.list().collectAsRetainedState(listOf())
-
-        val recents by mediaRepository.recents(getPlatform()).collectAsRetainedState(listOf())
 
         return MainScreen.State(
             self,
             notes,
             devices,
             recents,
-            isAddNoteShowing,
-            isStoragePermissionGranted,
+            storagePermission,
             addNote,
             { appDirs }
         ) { event ->
             when (event) {
                 is ToggleAddNote -> {
-                    isAddNoteShowing = !isAddNoteShowing
-                    addNote = ""
+                    if (addNote == null) addNote = AddNoteModal(initial = "")
+                    else {
+                        addNote!!.id?.let { noteRepository.deleteClip(it) }
+                        addNote = null
+                    }
                 }
 
                 is CreateNote -> {
-                    noteRepository.save(event.text)
-                    isAddNoteShowing = false
+                    noteRepository.clipToNote(event.text, addNote!!.id)
+                    addNote = null
                 }
 
                 is AddAccount -> {
@@ -214,7 +221,7 @@ class MainPresenter(
                     // TODO can probably wait
                     //val ok = requestStoragePermission.tryEmit(Unit)
                     //log.i { "RequestStoragePermission - ok: $ok" }
-                    runBlocking { sharedState.requestStoragePermission.updateState(Unit) }
+                    storagePermission.launchPermissionRequest()
                 }
 
                 is ViewAllMedia -> {
@@ -228,9 +235,7 @@ class MainPresenter(
 @CircuitInject(MainScreen::class, AppScope::class)
 @Composable
 fun MainView(state: MainScreen.State, modifier: Modifier = Modifier) {
-    if (state.isAddNoteShowing) {
-        AddNoteOverlay(state, initial = state.addNote)
-    }
+    AddNoteOverlay(state)
 
     //if (state.shared != null) {
     //    AddNoteOverlay(state, initial = state.shared)
@@ -288,7 +293,7 @@ fun MainView(state: MainScreen.State, modifier: Modifier = Modifier) {
                 ) {
                     item {
                         when {
-                            !state.isStoragePermissionGranted -> {
+                            !state.storagePermission.status.isGranted -> {
                                 InfoCard {
                                     // TODO maybe image
                                     Text(
@@ -559,9 +564,9 @@ fun NoteItem(note: Note) {
 @Composable
 fun AddNoteOverlay(
     state: MainScreen.State,
-    modifier: Modifier = Modifier,
-    initial: String = ""
+    modifier: Modifier = Modifier
 ) {
+    if (state.addNote == null) return
     BasicAlertDialog(onDismissRequest = {
         state.eventSink(ToggleAddNote)
     }) {
@@ -579,31 +584,34 @@ fun AddNoteOverlay(
                     fontWeight = FontWeight.Bold
                 )
 
-                var text by remember { mutableStateOf(initial) }
-                OutlinedTextField(
-                    value = text,
-                    onValueChange = { text = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Text") }
-                )
+                key(state.addNote) {
+                    // (key1 = state.addNote)
+                    var text by remember { mutableStateOf(state.addNote.initial) }
+                    OutlinedTextField(
+                        value = text,
+                        onValueChange = { text = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Text") }
+                    )
 
-                Spacer(Modifier.width(24.dp))
+                    Spacer(Modifier.width(24.dp))
 
-                Row(Modifier.align(Alignment.End)) {
-                    TextButton(onClick = {
-                        state.eventSink(ToggleAddNote)
-                    }) {
-                        Text("Cancel")
-                    }
-                    Spacer(Modifier.width(16.dp))
-                    TextButton(
-                        enabled = text.isNotBlank(),
-                        onClick = {
-                            state.eventSink(CreateNote(text))
-                            //onDismiss(AddNoteResult.Data(text))
-                        },
-                    ) {
-                        Text("Save")
+                    Row(Modifier.align(Alignment.End)) {
+                        TextButton(onClick = {
+                            state.eventSink(ToggleAddNote)
+                        }) {
+                            Text("Cancel")
+                        }
+                        Spacer(Modifier.width(16.dp))
+                        TextButton(
+                            enabled = text.isNotBlank(),
+                            onClick = {
+                                state.eventSink(CreateNote(text))
+                                //onDismiss(AddNoteResult.Data(text))
+                            },
+                        ) {
+                            Text("Save")
+                        }
                     }
                 }
             }

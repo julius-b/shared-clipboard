@@ -125,8 +125,7 @@ fun Route.mediasApi() {
                                     } catch (e: NumberFormatException) {
                                         // TODO test
                                         throw ValidationException(
-                                            "size",
-                                            ApiError.Schema(schema = "number")
+                                            "size", ApiError.Schema(schema = "number")
                                         )
                                     }
                                 }
@@ -136,8 +135,7 @@ fun Route.mediasApi() {
                                         meta.cre = part.value.toLong()
                                     } catch (e: NumberFormatException) {
                                         throw ValidationException(
-                                            "cre",
-                                            ApiError.Schema(schema = "number")
+                                            "cre", ApiError.Schema(schema = "number")
                                         )
                                     }
                                 }
@@ -147,8 +145,7 @@ fun Route.mediasApi() {
                                         meta.mod = part.value.toLong()
                                     } catch (e: NumberFormatException) {
                                         throw ValidationException(
-                                            "mod",
-                                            ApiError.Schema(schema = "number")
+                                            "mod", ApiError.Schema(schema = "number")
                                         )
                                     }
                                 }
@@ -187,13 +184,10 @@ fun Route.mediasApi() {
 
                 if (meta.path == null) throw ValidationException("path", ApiError.Required())
                 if (meta.dir == null) throw ValidationException("dir", ApiError.Required())
-                if (meta.size == null || meta.size == 0L) throw ValidationException(
-                    "size",
-                    ApiError.Required()
-                )
-                if (meta.size != fileSize) throw ValidationException(
-                    "size", ApiError.Reference("file-size", "$fileSize")
-                )
+                if (meta.size == null || meta.size == 0L)
+                    throw ValidationException("size", ApiError.Required())
+                if (meta.size != fileSize)
+                    throw ValidationException("size", ApiError.Reference("file-size", "$fileSize"))
                 //if (cre == null) throw ValidationException("cre", ErrorStatus.Required())
                 if (meta.mod == null) throw ValidationException("mod", ApiError.Required())
 

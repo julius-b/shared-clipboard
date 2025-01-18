@@ -47,8 +47,7 @@ fun Application.configureAdministration() {
                     // TODO disable for prod :)
                     // eg:500: io.ktor.server.plugins.BadRequestException: Failed to convert request body to class app.opia.routes.CreateMessage
                     call.respondText(
-                        text = "500: $cause",
-                        status = HttpStatusCode.InternalServerError
+                        text = "500: $cause", status = HttpStatusCode.InternalServerError
                     )
                 }
             }

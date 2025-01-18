@@ -49,13 +49,10 @@ fun Route.accountsApi() {
             // TODO Constraint -> Schema? Layout? sent length constraints?
             // UUID default: 36
             //if (handle.length < 3 || handle.length > handleWidth) throw ValidationException(Code.Constraint, "handle")
-            if (name.isEmpty() || name.length > 50) throw ValidationException(
-                "name", ApiError.Size(min = 1, max = 50, value = name)
-            )
-            if (secret.length < 8) throw ValidationException(
-                "secret",
-                ApiError.Size(min = 8, value = secret)
-            )
+            if (name.isEmpty() || name.length > 50)
+                throw ValidationException("name", ApiError.Size(min = 1, max = 50, value = name))
+            if (secret.length < 8)
+                throw ValidationException("secret", ApiError.Size(min = 8, value = secret))
 
             val responses =
                 call.request.headers.getAll(KeyChallengeResponse) ?: throw ValidationException(
@@ -123,8 +120,7 @@ fun Route.accountsApi() {
             call.respond(
                 HttpStatusCode.Created,
                 HintedApiSuccessResponse(
-                    data = account,
-                    hints = AccountHints(properties = properties)
+                    data = account, hints = AccountHints(properties = properties)
                 )
             )
         }
@@ -152,12 +148,10 @@ fun Route.accountsApi() {
 
             get("by-handle/{handle}") {
                 val handle = call.parameters["handle"] ?: throw ValidationException(
-                    "handle",
-                    ApiError.Required()
+                    "handle", ApiError.Required()
                 )
                 val account = accountsService.getByHandle(handle) ?: throw ValidationException(
-                    "handle",
-                    ApiError.Reference(value = handle)
+                    "handle", ApiError.Reference(value = handle)
                 )
                 call.respond(HttpStatusCode.OK, ApiSuccessResponse(data = account))
             }

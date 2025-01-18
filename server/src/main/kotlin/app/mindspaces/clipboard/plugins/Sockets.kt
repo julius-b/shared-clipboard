@@ -95,8 +95,7 @@ fun Application.configureSockets() {
                         log.info("[$accountId/$handle]: initializing new account channel...")
                         val responseFlow = MutableSharedFlow<Message>()
                         return@compute AccountConnectionState(
-                            responseFlow,
-                            responseFlow.asSharedFlow()
+                            responseFlow, responseFlow.asSharedFlow()
                         )
                     }
                     log.info("[$accountId/$handle]: current active account connections: ${v.cnt}+1")
@@ -115,10 +114,7 @@ fun Application.configureSockets() {
                 log.info("[$accountId/$handle]: requesting random media: $reqMedia")
                 reqMedia?.let {
                     val req = ApiMediaRequest(
-                        UUID.randomUUID(),
-                        reqMedia.id,
-                        installationId,
-                        Clock.System.now()
+                        UUID.randomUUID(), reqMedia.id, installationId, Clock.System.now()
                     )
                     msg(MediaRequest(req))
                 }

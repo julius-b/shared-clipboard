@@ -71,8 +71,7 @@ fun Route.authSessionsApi() {
             }
 
             if (account.secret != secret) throw ValidationException(
-                "secret",
-                ApiError.Forbidden(auth = "secret")
+                "secret", ApiError.Forbidden(auth = "secret")
             )
 
             val secretUpdate = accountsService.getLatestSecretUpdate(account.id, account.secret)
