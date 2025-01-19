@@ -33,8 +33,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        scheduleSyncWorker()
-
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         val clip = clipboard.primaryClip
         if (clip != null) {
@@ -56,21 +54,18 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            val storagePermission = rememberPermissionState(Permission.Storage) { granted ->
-                // TODO this callback does not work
-                if (granted) {
-                    Toast.makeText(this, "Storage permission granted", Toast.LENGTH_SHORT).show()
-                    log.i { "permission-result - storage permission granted, launching sync-worker..." }
-                    scheduleSyncWorker()
-                } else {
-                    log.w { "permission-result - storage permission denied" }
-                    Toast.makeText(this, "Storage permission denied", Toast.LENGTH_SHORT).show()
-                }
-            }
+            // NOTE: callback does not work for this permission-state because the request is
+            //       launched on a different instance (-> MainScreen)
+            val storagePermission = rememberPermissionState(Permission.Storage)
             if (storagePermission.status.isGranted) {
-                println("permission-result -  granted :)")
+                log.i { "permission-result - storage permission granted, launching sync-worker..." }
+                //Toast.makeText(this, "File access granted", Toast.LENGTH_SHORT).show()
                 scheduleSyncWorker()
-            } else println("permission-result - not granted :)")
+            } else {
+                log.w { "permission-result - storage permission denied" }
+                Toast.makeText(this, "File access denied, app will not work", Toast.LENGTH_LONG)
+                    .show()
+            }
 
             applicationComponent.clipboardApp()
         }

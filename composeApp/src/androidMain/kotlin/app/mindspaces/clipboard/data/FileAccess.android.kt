@@ -266,7 +266,7 @@ private fun queryMedia(
                 return@tx
             }
             val saved = mediaRepository.saveLocal(path, mediaType, cre, mod, size)
-            //log.i { "save - new: $path (mediaType: $mediaType, mod: $mod, dir: ${saved.dir})" }
+            //log.i { "save($mediaType) - new: $path (mod: $mod, dir: ${saved.dir})" }
         }
     }
 

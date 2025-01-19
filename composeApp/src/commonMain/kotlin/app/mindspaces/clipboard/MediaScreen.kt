@@ -2,20 +2,23 @@ package app.mindspaces.clipboard
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Scaffold
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
@@ -27,6 +30,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.mindspaces.clipboard.MediaScreen.Event.Back
 import app.mindspaces.clipboard.MediaScreen.Event.MediaClicked
 import app.mindspaces.clipboard.data.ThumbFetcher
 import app.mindspaces.clipboard.data.ThumbFetcherCoilModel
@@ -59,10 +63,12 @@ import sharedclipboard.composeapp.generated.resources.Res
 import software.amazon.lastmile.kotlin.inject.anvil.AppScope
 
 @CommonParcelize
-data object MediaScreen : Screen {
+data class MediaScreen(
+    val dir: String? = null
+) : Screen {
     data class State(
         // NOTE: properties might be outdated
-        val currentDir: String?,
+        val title: String,
         val medias: List<DisplayMedia>,
         val getAppDirs: () -> AppDirs,
         val eventSink: (Event) -> Unit
@@ -70,6 +76,7 @@ data object MediaScreen : Screen {
 
     sealed interface Event : CircuitUiEvent {
         data class MediaClicked(val media: DisplayMedia) : Event
+        data object Back : Event
     }
 }
 
@@ -93,6 +100,7 @@ data class DisplayMedia(
 @CircuitInject(MediaScreen::class, AppScope::class)
 @Inject
 class MediaPresenter(
+    @Assisted private val screen: MediaScreen,
     @Assisted private val navigator: Navigator,
     private val mediaRepository: MediaRepository,
     private val appDirs: AppDirs
@@ -101,17 +109,16 @@ class MediaPresenter(
 
     @Composable
     override fun present(): MediaScreen.State {
-        var currentDir by rememberRetained { mutableStateOf<String?>(null) }
-
-        val medias by mediaRepository.list(currentDir).map { medias ->
-            log.i { "new medias: $medias" }
+        val title = screen.dir?.substringAfterLast('/') ?: "Gallery"
+        val medias by mediaRepository.list(screen.dir).map { medias ->
+            log.i { "medias: $medias" }
             withContext(IO) {
                 medias.map {
                     // TODO cross platform
                     val name =
-                        if (currentDir == null) it.dir.substringAfterLast('/')
+                        if (screen.dir == null) it.dir.substringAfterLast('/')
                         else it.path.substringAfterLast('/')
-                    val type = if (currentDir == null) MediaType.Directory else MediaType.File
+                    val type = if (screen.dir == null) MediaType.Directory else MediaType.File
 
                     // TODO this generates thumbs for every file beforehand!! should be lazy
                     //val bmp = getThumbBitmap(appDirs, it)
@@ -126,36 +133,50 @@ class MediaPresenter(
         //val all by mediaRepository.all().collectAsRetainedState(listOf())
 
         return MediaScreen.State(
-            currentDir,
+            title,
             medias,
             { appDirs }
         ) { event ->
             when (event) {
                 is MediaClicked -> {
-                    currentDir = event.media.media.dir
+                    if (event.media.type == MediaType.Directory) {
+                        log.i { "entering dir: ${event.media}" }
+                        navigator.goTo(MediaScreen(event.media.media.dir))
+                        return@State
+                    }
                 }
+
+                is Back -> navigator.pop()
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @CircuitInject(MediaScreen::class, AppScope::class)
 @Composable
 fun MediaView(state: MediaScreen.State, modifier: Modifier = Modifier) {
     Scaffold(
         topBar = {
-            Row(
-                modifier = Modifier.padding(top = 18.dp, start = 18.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    "Gallery".uppercase(),
-                    //color = Color.Black,
-                    fontSize = 24.sp,
-                    //fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily(Font(Res.font.Anton_Regular))
-                )
-            }
+            TopAppBar(
+                title = {
+                    Text(
+                        state.title.uppercase(),
+                        //color = Color.Black,
+                        fontSize = 24.sp,
+                        //fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily(Font(Res.font.Anton_Regular))
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = { state.eventSink(Back) }) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Default.KeyboardArrowLeft,
+                            contentDescription = "Back"
+                        )
+                    }
+                }
+            )
         }
     ) {
         // TODO DI (LocalPlatformContext...)
@@ -235,7 +256,7 @@ fun MediaView(state: MediaScreen.State, modifier: Modifier = Modifier) {
                     Text(
                         modifier = Modifier.align(Alignment.BottomStart).padding(10.dp),
                         text = media.name,
-                        style = MaterialTheme.typography.body2,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = Color.White,
                         maxLines = 1
                     )

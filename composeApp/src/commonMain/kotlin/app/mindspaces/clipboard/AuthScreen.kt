@@ -104,13 +104,8 @@ class AuthPresenter(
                     }
                 }
 
-                is Login -> {
-                    navigator.goTo(SignInScreen)
-                }
-
-                is Back -> {
-                    navigator.pop()
-                }
+                is Login -> navigator.goTo(SignInScreen)
+                is Back -> navigator.pop()
             }
         }
     }

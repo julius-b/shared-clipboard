@@ -209,24 +209,13 @@ class MainPresenter(
                     addNote = null
                 }
 
-                is AddAccount -> {
-                    navigator.goTo(AuthScreen)
-                }
-
                 is CreateAccount -> {
 
                 }
 
-                is RequestStoragePermission -> {
-                    // TODO can probably wait
-                    //val ok = requestStoragePermission.tryEmit(Unit)
-                    //log.i { "RequestStoragePermission - ok: $ok" }
-                    storagePermission.launchPermissionRequest()
-                }
-
-                is ViewAllMedia -> {
-                    navigator.goTo(MediaScreen)
-                }
+                is AddAccount -> navigator.goTo(AuthScreen)
+                is RequestStoragePermission -> storagePermission.launchPermissionRequest()
+                is ViewAllMedia -> navigator.goTo(MediaScreen())
             }
         }
     }
