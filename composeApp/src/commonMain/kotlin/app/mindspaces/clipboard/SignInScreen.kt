@@ -18,10 +18,15 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,9 +35,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.mindspaces.clipboard.SignInScreen.Event.Authenticate
 import app.mindspaces.clipboard.SignInScreen.Event.Back
+import app.mindspaces.clipboard.api.ApiError
+import app.mindspaces.clipboard.components.SecretInputField
 import app.mindspaces.clipboard.components.SimpleInputField
 import app.mindspaces.clipboard.parcel.CommonParcelize
 import app.mindspaces.clipboard.repo.AuthRepository
+import app.mindspaces.clipboard.repo.RepoResult
 import co.touchlab.kermit.Logger
 import com.slack.circuit.codegen.annotations.CircuitInject
 import com.slack.circuit.retained.rememberRetained
@@ -42,6 +50,9 @@ import com.slack.circuit.runtime.Navigator
 import com.slack.circuit.runtime.internal.rememberStableCoroutineScope
 import com.slack.circuit.runtime.presenter.Presenter
 import com.slack.circuit.runtime.screen.Screen
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import me.tatarka.inject.annotations.Assisted
 import me.tatarka.inject.annotations.Inject
 import org.jetbrains.compose.resources.Font
@@ -53,6 +64,7 @@ import software.amazon.lastmile.kotlin.inject.anvil.AppScope
 data object SignInScreen : Screen {
     data class State(
         val loading: Boolean,
+        val snackbarHostState: SnackbarHostState,
         val eventSink: (Event) -> Unit
     ) : CircuitUiState
 
@@ -76,11 +88,62 @@ class SignInPresenter(
 
         var loading by rememberRetained { mutableStateOf(false) }
 
-        return SignInScreen.State(loading) { event ->
+        val snackbarHostState = remember { SnackbarHostState() }
+
+        fun showSnackbar(text: String) {
+            scope.launch(Dispatchers.Main) {
+                snackbarHostState.currentSnackbarData?.dismiss()
+                snackbarHostState.showSnackbar(text, duration = SnackbarDuration.Short)
+            }
+        }
+
+        return SignInScreen.State(loading, snackbarHostState) { event ->
             when (event) {
                 is Authenticate -> {
                     loading = true
-                    // TODO ...
+                    scope.launch(Dispatchers.IO) {
+                        val session = authRepository.login(event.unique, event.secret)
+                        when (session) {
+                            is RepoResult.Data -> {
+                                log.i { "session created - name=${session.data.account.name}" }
+                                withContext(Dispatchers.Main) {
+                                    navigator.pop()
+                                    navigator.pop()
+                                }
+                            }
+
+                            is RepoResult.ValidationError -> {
+                                log.w { "validation errors: ${session.errors}" }
+                                session.errors?.forEach { err ->
+                                    log.w { "${err.key}: ${err.value.contentDeepToString()}" }
+                                    when (err.key) {
+                                        "unique" -> {
+                                            if (err.value.any { it is ApiError.Reference }) {
+                                                showSnackbar("unknown e-mail")
+                                                return@launch
+                                            }
+                                        }
+
+                                        "secret" -> {
+                                            if (err.value.any { it is ApiError.Forbidden }) {
+                                                showSnackbar("wrong password")
+                                                return@launch
+                                            }
+                                        }
+                                    }
+                                }
+
+                                showSnackbar("Please check your inputs")
+                            }
+
+                            else -> {
+                                log.w { "network error: $session" }
+                                showSnackbar("Network error")
+                            }
+                        }
+                    }.invokeOnCompletion {
+                        loading = false
+                    }
                 }
 
                 is Back -> {
@@ -94,8 +157,10 @@ class SignInPresenter(
 @CircuitInject(SignInScreen::class, AppScope::class)
 @Composable
 fun SignInView(state: SignInScreen.State, modifier: Modifier = Modifier) {
+    // TODO share snachbarHostState across app?
     Scaffold(
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
+        snackbarHost = { SnackbarHost(hostState = state.snackbarHostState) }
     ) { innerPadding ->
         Column(
             modifier = modifier.fillMaxSize().padding(innerPadding)
@@ -131,6 +196,20 @@ fun SignInView(state: SignInScreen.State, modifier: Modifier = Modifier) {
                     onValueChange = { unique = it }
                 )
 
+                var secret by rememberRetained { mutableStateOf("") }
+                val secretValid = secret.length >= minSecretSize
+                SecretInputField(
+                    label = "Password",
+                    value = secret,
+                    valid = secretValid,
+                    onValueChanged = { secret = it },
+                    errorText = "minimum $minSecretSize characters"
+                )
+
+                Spacer(Modifier.height(16.dp))
+
+                val ok = uniqueValid && secretValid
+
                 Row(Modifier.align(Alignment.End), verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = {
                         state.eventSink(Back)
@@ -142,6 +221,14 @@ fun SignInView(state: SignInScreen.State, modifier: Modifier = Modifier) {
                         )
                     }
                     Spacer(Modifier.weight(1f))
+                    TextButton(
+                        enabled = ok && !state.loading,
+                        onClick = {
+                            state.eventSink(Authenticate(unique, secret))
+                        },
+                    ) {
+                        Text("Login")
+                    }
                 }
             }
         }

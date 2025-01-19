@@ -13,6 +13,8 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
+import org.jetbrains.exposed.sql.lowerCase
+import org.jetbrains.exposed.sql.trim
 import java.security.SecureRandom
 import java.util.UUID
 
@@ -31,7 +33,10 @@ object AccountProperties : UUIDTable() {
     val deletedAt = timestamp("deleted_at").nullable()
 
     init {
-        uniqueIndex(content) { (valid eq true) and (primary eq true) and (deletedAt eq null) }
+        uniqueIndex(
+            functions = listOf(content.trim().lowerCase())
+        ) { (primary eq true) and (deletedAt eq null) }
+        uniqueIndex(accountId, type) { (primary eq true) and (deletedAt eq null) }
     }
 }
 
@@ -81,23 +86,26 @@ class AccountPropertiesService {
     }
 
     suspend fun getPrimaryByContent(content: String): ApiAccountProperty? = tx {
-        AccountPropertyEntity.find { (AccountProperties.primary eq true) and (AccountProperties.content eq content) and (AccountProperties.deletedAt eq null) }
+        // compare as lowercase, TODO use db lowerCase
+        val c = content.trim().lowercase()
+        AccountPropertyEntity.find { (AccountProperties.primary eq true) and (AccountProperties.content.lowerCase() eq c) and (AccountProperties.deletedAt eq null) }
             .firstOrNull()?.toDTO()
     }
 
     suspend fun create(
         installationId: UUID,
-        type: ApiAccountProperty.Type,
+        type: Type,
         content: String
     ): ApiAccountProperty = tx {
+        val c = content.trim()
         // [min, max)
         val verificationCode = SecureRandom.getInstanceStrong().nextInt(100_000, 1_000_000)
-        log.info("create - verificationCode: $verificationCode")
+        log.info("create - content: $c, verificationCode: $verificationCode")
 
         AccountPropertyEntity.new {
             this.installationId = EntityID(installationId, Installations)
             this.type = type
-            this.content = content
+            this.content = c
             this.verificationCode = verificationCode.toString()
         }.toDTO()
     }

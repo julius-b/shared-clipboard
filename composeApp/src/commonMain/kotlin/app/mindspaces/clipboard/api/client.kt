@@ -88,9 +88,10 @@ fun newHttpClient(
         install(Auth) {
             bearer {
                 loadTokens {
-                    log.d { "querying access tokens..." }
+                    log.d { "querying auth sessions..." }
                     val session = db.authSessionQueries.getLatest().executeAsOneOrNull()
                         ?: return@loadTokens null
+                    log.i { "got auth session: $session" }
                     BearerTokens(session.access_token, session.refresh_token)
                 }
                 refreshTokens {

@@ -21,10 +21,9 @@ data class HintedApiSuccessResponse<out T : Any, out S : Any>(
     @EncodeDefault(EncodeDefault.Mode.NEVER) val count: Int? = null, val data: T, val hints: S
 )
 
-// no general code
 @Serializable
 data class ApiErrorResponse(
-    val error: ApiError? = null, @EncodeDefault(EncodeDefault.Mode.NEVER) val errors: Errors? = null
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val errors: Errors
 )
 
 typealias Errors = Map<String, Array<out ApiError>>

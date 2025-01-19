@@ -1,7 +1,5 @@
 package app.mindspaces.clipboard.plugins
 
-import app.mindspaces.clipboard.api.ApiError
-import app.mindspaces.clipboard.api.ApiErrorResponse
 import app.mindspaces.clipboard.routes.accountsApi
 import app.mindspaces.clipboard.routes.authSessionsApi
 import app.mindspaces.clipboard.routes.installationsApi
@@ -30,9 +28,6 @@ fun Application.configureRouting() {
         }
         get<Notes> { note ->
             call.respond("List of notes sorted starting from ${note.sort}")
-        }
-        get("test") {
-            call.respond(ApiErrorResponse(ApiError.Conflict()))
         }
         route("api") {
             route("v1") {

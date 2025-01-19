@@ -9,65 +9,63 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 sealed class ApiError {
-    // if multiple of a type are submitted, ref point to the submitted id/value that is causing the error
-
-    abstract val ref: String?
-
-    // the value that is actually wrong, might be ref
-    // useful for example to see a sanitized version
+    // the value that is actually wrong
+    // useful to see a sanitized version
     abstract val value: String?
 
-    // code wrong size:
-    // "errors": { "Challenge-Response": [ { "type": "size", "property": "code", "value": "<code>", "ref": "<prop-id>" } ] }
     @Serializable
-    @SerialName("size")
-    data class Size(
-        @EncodeDefault(EncodeDefault.Mode.NEVER) val min: Int? = null,
-        @EncodeDefault(EncodeDefault.Mode.NEVER) val max: Int? = null,
-        @EncodeDefault(EncodeDefault.Mode.NEVER) override val ref: String? = null,
-        @EncodeDefault(EncodeDefault.Mode.NEVER) override val value: String? = null
+    @SerialName("constraint")
+    data class Constraint(
+        @EncodeDefault(EncodeDefault.Mode.NEVER) override val value: String? = null,
+        @EncodeDefault(EncodeDefault.Mode.NEVER) val min: Long? = null,
+        @EncodeDefault(EncodeDefault.Mode.NEVER) val max: Long? = null,
+        @EncodeDefault(EncodeDefault.Mode.NEVER) val equal: String? = null
     ) : ApiError()
 
-    // specific type may be required
-    // errors: { "Challenge-Response": [ { "code": "required", "category": "Phone-No" } ] }
     @Serializable
     @SerialName("required")
     data class Required(
-        // `type` for serial
-        @EncodeDefault(EncodeDefault.Mode.NEVER) val category: String? = null,
-        @EncodeDefault(EncodeDefault.Mode.NEVER) override val ref: String? = null,
-        @EncodeDefault(EncodeDefault.Mode.NEVER) override val value: String? = null
+        @EncodeDefault(EncodeDefault.Mode.NEVER) override val value: String? = null,
+        @EncodeDefault(EncodeDefault.Mode.NEVER) val category: String? = null
     ) : ApiError()
 
     @Serializable
     @SerialName("schema")
     data class Schema(
-        @EncodeDefault(EncodeDefault.Mode.NEVER) val schema: String? = null,
-        @EncodeDefault(EncodeDefault.Mode.NEVER) override val ref: String? = null,
-        @EncodeDefault(EncodeDefault.Mode.NEVER) override val value: String? = null
+        @EncodeDefault(EncodeDefault.Mode.NEVER) override val value: String? = null,
+        @EncodeDefault(EncodeDefault.Mode.NEVER) val schema: String? = null
     ) : ApiError()
 
-    // invalid code:
-    // "errors": { "Challenge-Response": [ { "property": "code", "value": "<code>", "ref": "<prop-id>" } ] }
     @Serializable
     @SerialName("forbidden")
     data class Forbidden(
-        @EncodeDefault(EncodeDefault.Mode.NEVER) val auth: String? = null,
-        @EncodeDefault(EncodeDefault.Mode.NEVER) override val ref: String? = null,
-        @EncodeDefault(EncodeDefault.Mode.NEVER) override val value: String? = null
+        @EncodeDefault(EncodeDefault.Mode.NEVER) override val value: String? = null,
+        @EncodeDefault(EncodeDefault.Mode.NEVER) val property: String? = null
+    ) : ApiError()
+
+    @Serializable
+    @SerialName("unauthenticated")
+    data class Unauthenticated(
+        @EncodeDefault(EncodeDefault.Mode.NEVER) override val value: String? = null,
+        @EncodeDefault(EncodeDefault.Mode.NEVER) val property: String? = null
     ) : ApiError()
 
     @Serializable
     @SerialName("reference")
     data class Reference(
-        @EncodeDefault(EncodeDefault.Mode.NEVER) override val ref: String? = null,
-        @EncodeDefault(EncodeDefault.Mode.NEVER) override val value: String? = ref
+        @EncodeDefault(EncodeDefault.Mode.NEVER) override val value: String? = null
     ) : ApiError()
 
     @Serializable
     @SerialName("conflict")
     data class Conflict(
-        @EncodeDefault(EncodeDefault.Mode.NEVER) override val ref: String? = null,
-        @EncodeDefault(EncodeDefault.Mode.NEVER) override val value: String? = ref
+        @EncodeDefault(EncodeDefault.Mode.NEVER) override val value: String? = null,
+        @EncodeDefault(EncodeDefault.Mode.NEVER) val category: String? = null
+    ) : ApiError()
+
+    @Serializable
+    @SerialName("internal")
+    data class Internal(
+        @EncodeDefault(EncodeDefault.Mode.NEVER) override val value: String? = null
     ) : ApiError()
 }

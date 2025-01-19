@@ -87,6 +87,14 @@ class InstallationsService {
     suspend fun create(
         id: UUID, name: String, desc: String, os: Platform, client: String
     ): ApiInstallation = tx {
+        val curr = InstallationEntity.findByIdAndUpdate(id) {
+            it.name = name
+            it.desc = desc
+            it.os = os
+            it.client = client
+        }
+        if (curr != null) return@tx curr.toDTO()
+
         InstallationEntity.new(id) {
             this.name = name
             this.desc = desc
@@ -111,8 +119,8 @@ class InstallationsService {
         InstallationLinkEntity.all().map(InstallationLinkEntity::toDTO)
     }
 
-    suspend fun getLink(ioid: UUID): ApiInstallationLink? = tx {
-        InstallationLinkEntity.findById(ioid)?.toDTO()
+    suspend fun getLink(id: UUID): ApiInstallationLink? = tx {
+        InstallationLinkEntity.findById(id)?.toDTO()
     }
 
     suspend fun deleteLinks(accountId: UUID, installationId: UUID) = tx {

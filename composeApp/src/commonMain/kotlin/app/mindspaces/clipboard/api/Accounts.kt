@@ -23,6 +23,9 @@ fun ApiAccountProperty.toEntity() = AccountProperty(
 
 @Resource("/accounts")
 class Accounts {
+    @Resource("signup")
+    class Signup(val parent: Accounts = Accounts())
+
     @Resource("{id}")
     class Id(val id: SUUID, val parent: Accounts = Accounts())
 

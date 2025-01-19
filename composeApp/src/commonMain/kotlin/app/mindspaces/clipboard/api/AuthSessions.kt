@@ -7,7 +7,7 @@ fun ApiAuthSession.toEntity() = AuthSession(
     id,
     accountId,
     installationId,
-    ioid,
+    linkId,
     secretUpdateId,
     refreshToken,
     accessToken,

@@ -10,8 +10,3 @@ class ValidationException(val field: String, vararg val errors: ApiError) : Exce
     override val message: String
         get() = "${this.field}: ${errors.contentToString()}"
 }
-
-class SimpleValidationException(val error: ApiError) : Exception() {
-    override val message: String
-        get() = "$error"
-}

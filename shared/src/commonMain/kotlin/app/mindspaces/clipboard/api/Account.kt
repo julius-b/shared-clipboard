@@ -33,7 +33,21 @@ data class ApiAccount(
 @Serializable
 data class AccountParams(
     //val handle: String,
-    val name: String, val secret: String
+    val name: String,
+    val secret: String
+)
+
+@Serializable
+data class AccountHints(
+    val properties: List<ApiAccountProperty>,
+    val session: ApiAuthSession
+)
+
+@Serializable
+data class SignupParams(
+    val name: String,
+    val secret: String,
+    val email: String
 )
 
 @Serializable

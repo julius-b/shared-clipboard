@@ -11,16 +11,12 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -31,15 +27,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.mindspaces.clipboard.AuthScreen.Event.Authenticate
 import app.mindspaces.clipboard.AuthScreen.Event.Back
 import app.mindspaces.clipboard.AuthScreen.Event.Login
+import app.mindspaces.clipboard.components.SecretInputField
 import app.mindspaces.clipboard.components.SimpleInputField
 import app.mindspaces.clipboard.parcel.CommonParcelize
 import app.mindspaces.clipboard.repo.AuthRepository
@@ -96,33 +89,12 @@ class AuthPresenter(
                 is Authenticate -> {
                     loading = true
                     scope.launch(Dispatchers.IO) {
-                        val property = authRepository.createProperty(event.email)
-                        if (property !is RepoResult.Data) {
-                            log.e { "failed to create property: $property" }
-
-                            if (property is RepoResult.NetworkError) {
-                                // TODO snackbar...
-                            }
-
-                            return@launch
-                        }
-
-                        // TODO handle case: signup goes through, login encounters temporary network failure, display to user, do again
-                        //      how to get account? user has to click on login themselves? then at least retry login in here 2 times
-                        //      alt: if _both_ actor & property for the entered email exists locally, skip property/signup (together only saved after successful signup)
-                        val account =
-                            authRepository.signup(event.name, event.secret, listOf(property.data))
+                        val account = authRepository.signup(event.name, event.secret, event.email)
                         if (account !is RepoResult.Data) {
                             log.e { "failed to create account: $account" }
                             return@launch
                         }
                         log.i { "account created - name=${account.data.account.name}" }
-
-                        val authSession = authRepository.login(event.email, event.secret)
-                        if (authSession !is RepoResult.Data) {
-                            log.e { "failed to create session: $authSession" }
-                            return@launch
-                        }
 
                         withContext(Dispatchers.Main) {
                             navigator.pop()
@@ -231,61 +203,14 @@ fun AuthView(state: AuthScreen.State, modifier: Modifier = Modifier) {
                 )
 
                 var secret by rememberRetained { mutableStateOf("") }
-                var secretTouched by rememberRetained { mutableStateOf(false) }
-                var secretVisible by rememberRetained { mutableStateOf(false) }
                 val secretValid = secret.length >= minSecretSize
-                OutlinedTextField(
+                SecretInputField(
+                    label = "Password",
                     value = secret,
-                    onValueChange = {
-                        secret = it
-                        secretTouched = true
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Password") },
-                    supportingText = {
-                        Text(
-                            "minimum $minSecretSize characters", modifier = Modifier.fillMaxWidth(),
-                            textAlign = TextAlign.End,
-                        )
-                    },
-                    isError = secretTouched && !secretValid,
-                    visualTransformation = if (secretVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    trailingIcon = {
-                        // TODO icon visibility/Off
-                        val image = if (secretVisible) Icons.Outlined.Lock else Icons.Outlined.Info
-
-                        val description = if (secretVisible) "Hide password" else "Show password"
-
-                        IconButton(onClick = { secretVisible = !secretVisible }) {
-                            Icon(imageVector = image, description)
-                        }
-                    },
-                    singleLine = true
+                    valid = secretValid,
+                    onValueChanged = { secret = it },
+                    errorText = "minimum $minSecretSize characters"
                 )
-
-                /*var secret2 by rememberRetained { mutableStateOf("") }
-                var secret2Touched by rememberRetained { mutableStateOf(false) }
-                val secret2Valid = secret2 == secret
-                OutlinedTextField(
-                    value = secret2,
-                    onValueChange = {
-                        secret2 = it
-                        secret2Touched = true
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Repeat Password") },
-                    supportingText = {
-                        Text(
-                            "must match password", modifier = Modifier.fillMaxWidth(),
-                            textAlign = TextAlign.End,
-                        )
-                    },
-                    isError = secret2Touched && !secret2Valid,
-                    visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    singleLine = true
-                )*/
 
                 Spacer(Modifier.height(24.dp))
 

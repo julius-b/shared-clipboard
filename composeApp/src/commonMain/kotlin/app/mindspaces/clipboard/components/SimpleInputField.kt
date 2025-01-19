@@ -28,12 +28,13 @@ fun SimpleInputField(
         onValueChange = {
             onValueChange(it)
             // NOTE: consider only setting error after leaving focus
-            touched = true
+            //touched = true
         },
         modifier = Modifier.fillMaxWidth().onFocusChanged { focusState ->
             if (focusState.isFocused) wasFocused = true
             if (!focusState.isFocused && wasFocused) touched = true
         },
+        label = { Text(label) },
         supportingText = {
             if (touched && !valid) {
                 Text(
@@ -42,7 +43,6 @@ fun SimpleInputField(
                 )
             }
         },
-        label = { Text(label) },
         isError = touched && !valid,
         singleLine = true
     )

@@ -29,10 +29,10 @@ import java.io.File
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
-const val ThumbMaxSizeInMB = 20L
+const val ThumbMaxSize: Long = 20 * 1024 * 1024
 
 // TODO implement chunk receiver, client (read stream from byte 500 to 1000, eg.)
-const val FileMaxSizeInMB = 500L
+const val FileMaxSize: Long = 500 * 1024 * 1024
 
 @Serializable
 enum class UploadType {
@@ -91,14 +91,15 @@ fun Route.mediasApi() {
             }
             log.info("[m:$lockKey] lock acquired")
             try {
-                val contentLengthBytes =
-                    call.request.header(HttpHeaders.ContentLength)?.toDouble() ?: 0.0
-                val contentLengthMB = contentLengthBytes / 1024 / 1024
+                val contentLength =
+                    call.request.header(HttpHeaders.ContentLength)?.toDouble()
+                        ?: throw ValidationException(HttpHeaders.ContentLength, ApiError.Required())
                 val maxFileSize =
-                    if (type == UploadType.Thumb) ThumbMaxSizeInMB else FileMaxSizeInMB
-                if (contentLengthMB > maxFileSize) {
-                    throw ValidationException("file", ApiError.Size())
-                }
+                    if (type == UploadType.Thumb) ThumbMaxSize else FileMaxSize
+                if (contentLength > maxFileSize) throw ValidationException(
+                    HttpHeaders.ContentLength,
+                    ApiError.Constraint("$contentLength", max = maxFileSize)
+                )
 
                 // should query current hasFile/Thumb state after acquiring lock
                 if (file.exists()) {
@@ -111,7 +112,7 @@ fun Route.mediasApi() {
                 // default is 50MB: https://youtrack.jetbrains.com/issue/KTOR-7987/ktor-server-receive-MultiPartData-error
                 // TODO allow maxFileSize + overhead
                 val multipartData =
-                    call.receiveMultipart(formFieldLimit = maxFileSize * 1024 * 1024)
+                    call.receiveMultipart(formFieldLimit = maxFileSize)
                 multipartData.forEachPart { part ->
                     when (part) {
                         is PartData.FormItem -> {
@@ -125,7 +126,7 @@ fun Route.mediasApi() {
                                     } catch (e: NumberFormatException) {
                                         // TODO test
                                         throw ValidationException(
-                                            "size", ApiError.Schema(schema = "number")
+                                            "size", ApiError.Schema(part.value, schema = "number")
                                         )
                                     }
                                 }
@@ -135,7 +136,7 @@ fun Route.mediasApi() {
                                         meta.cre = part.value.toLong()
                                     } catch (e: NumberFormatException) {
                                         throw ValidationException(
-                                            "cre", ApiError.Schema(schema = "number")
+                                            "cre", ApiError.Schema(part.value, schema = "number")
                                         )
                                     }
                                 }
@@ -145,7 +146,7 @@ fun Route.mediasApi() {
                                         meta.mod = part.value.toLong()
                                     } catch (e: NumberFormatException) {
                                         throw ValidationException(
-                                            "mod", ApiError.Schema(schema = "number")
+                                            "mod", ApiError.Schema(part.value, schema = "number")
                                         )
                                     }
                                 }
@@ -186,8 +187,9 @@ fun Route.mediasApi() {
                 if (meta.dir == null) throw ValidationException("dir", ApiError.Required())
                 if (meta.size == null || meta.size == 0L)
                     throw ValidationException("size", ApiError.Required())
-                if (meta.size != fileSize)
-                    throw ValidationException("size", ApiError.Reference("file-size", "$fileSize"))
+                if (meta.size != fileSize) throw ValidationException(
+                    "size", ApiError.Constraint("$fileSize", equal = "${meta.size}")
+                )
                 //if (cre == null) throw ValidationException("cre", ErrorStatus.Required())
                 if (meta.mod == null) throw ValidationException("mod", ApiError.Required())
 
@@ -248,6 +250,7 @@ fun Route.mediasApi() {
                 val selfId = UUID.fromString(principal.payload.getClaim("account_id").asString())
                 val selfInstallationId =
                     UUID.fromString(principal.payload.getClaim("installation_id").asString())
+                // TODO && account.auth != Default
                 val all = call.queryParameters["all"] != null
 
                 val accountId = if (all) null else selfId

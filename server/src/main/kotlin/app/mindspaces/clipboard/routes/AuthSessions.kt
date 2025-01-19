@@ -11,8 +11,8 @@ import app.mindspaces.clipboard.services.accountPropertiesService
 import app.mindspaces.clipboard.services.accountsService
 import app.mindspaces.clipboard.services.authSessionsService
 import app.mindspaces.clipboard.services.installationsService
+import app.mindspaces.clipboard.services.sanitizeHandle
 import app.mindspaces.clipboard.services.sanitizeSecret
-import app.mindspaces.clipboard.services.sanitizeUnique
 import app.mindspaces.clipboard.services.toAuthSession
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
@@ -22,96 +22,61 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
-import io.ktor.util.encodeBase64
 import io.ktor.util.logging.KtorSimpleLogger
 import java.util.Date
 import java.util.UUID
-import kotlin.random.Random
 
 fun Route.authSessionsApi() {
     val log = KtorSimpleLogger("auth-sessions-api")
-
-    val tokenSecret = environment.config.property("jwt.secret").getString()
-    val tokenIssuer = environment.config.property("jwt.issuer").getString()
-    val tokenAudience = environment.config.property("jwt.audience").getString()
-
-    log.info("init - iss: $tokenIssuer, aud: $tokenAudience")
-
-    fun genAccessToken(accountId: UUID, ioid: UUID, installationId: UUID, handle: String): String {
-        val twoHours = 60_000 * 120
-
-        // TODO startup check to "Ensure the length of the secret is at least 256 bit long"
-        return JWT.create()
-            .withAudience(tokenAudience)
-            .withIssuer(tokenIssuer)
-            .withClaim("handle", handle)
-            .withClaim("account_id", accountId.toString())
-            .withClaim("ioid", ioid.toString())
-            .withClaim("installation_id", installationId.toString())
-            .withExpiresAt(Date(System.currentTimeMillis() + twoHours))
-            .sign(Algorithm.HMAC256(tokenSecret))
-    }
 
     route("auth_sessions") {
         post {
             val installationId = UUID.fromString(call.request.headerOrFail(KeyInstallationID))
             val req = call.receive<AuthSessionParams>()
 
-            val unique = req.unique.sanitizeUnique()
+            // property is not saved as lowercase
+            val unique = req.unique.trim()
             val secret = req.secret.sanitizeSecret()
-            var ioid = req.ioid
 
-            var account = accountsService.getByHandle(unique)
+            var account = accountsService.getByHandle(unique.sanitizeHandle())
             if (account == null) {
                 val property = accountPropertiesService.getPrimaryByContent(unique)
-                    ?: throw ValidationException(
-                        "unique", ApiError.Reference(value = unique)
-                    )
+                    ?: throw ValidationException("unique", ApiError.Reference(value = unique))
                 account = accountsService.get(property.accountId!!)!!
             }
 
-            if (account.secret != secret) throw ValidationException(
-                "secret", ApiError.Forbidden(auth = "secret")
-            )
+            if (account.secret != secret) throw ValidationException("secret", ApiError.Forbidden())
 
             val secretUpdate = accountsService.getLatestSecretUpdate(account.id, account.secret)
             if (secretUpdate == null) {
                 log.error("post - failed to find SecretUpdate, account=${account.id}")
-                throw IllegalStateException("secret-update expected for account=${account.id}")
+                throw ValidationException("secret_update", ApiError.Internal())
             }
 
-            if (ioid != null) {
-                val link = installationsService.getLink(ioid)
-                if (link == null) {
-                    call.respond(HttpStatusCode.UnprocessableEntity)
-                    return@post
-                }
-                if (link.accountId != account.id) {
-                    // TODO....... sometimes we use 403, sometimes forbidden in a 400
-                    call.respond(HttpStatusCode.Forbidden)
-                    return@post
-                }
+            val link = if (req.linkId != null) {
+                val link = installationsService.getLink(req.linkId!!)
+                    ?: throw ValidationException(
+                        "link_id", ApiError.Reference(req.linkId.toString())
+                    )
+                if (link.accountId != account.id) throw ValidationException(
+                    "link_id", ApiError.Forbidden(req.linkId.toString(), "account_id")
+                )
+                link
                 // TODO delete keys (?)
             } else {
+                // TODO could reuse link
                 log.info("post - linking account ${account.id} with installation $installationId")
                 installationsService.deleteLinks(account.id, installationId)
-                val link = installationsService.linkInstallation(account.id, installationId)
-
+                installationsService.linkInstallation(account.id, installationId)
                 // TODO broadcast to account socket
-
-                ioid = link.id
             }
 
-            val accessToken = genAccessToken(account.id, ioid, installationId, account.handle)
-            val refreshToken = Random.nextBytes(64).encodeBase64()
-            //val refreshToken = getRandomString(64, AlphaNumCharset)
-
+            val accessToken = genAccessToken(account.id, link.id, installationId, account.handle)
             val dbAuthSession = authSessionsService.create(
-                account.id, installationId, ioid, secretUpdate.id.value, refreshToken
+                account.id, installationId, link.id, secretUpdate.id.value
             )
             val authSession = dbAuthSession.toAuthSession(accessToken)
-
-            log.info("create - authSession: $authSession")
+            log.info("post - authSession: $authSession")
 
             val properties = accountPropertiesService.list(account.id)
 
@@ -149,16 +114,38 @@ fun Route.authSessionsApi() {
             }
 
             val accessToken =
-                genAccessToken(account.id, curr.ioid, curr.installationId, account.handle)
-            val refreshToken = Random.nextBytes(64).encodeBase64()
+                genAccessToken(account.id, curr.linkId, curr.installationId, account.handle)
             val dbAuthSession = authSessionsService.create(
-                curr.accountId, curr.installationId, curr.ioid, curr.secretUpdateId, refreshToken
+                curr.accountId, curr.installationId, curr.linkId, curr.secretUpdateId
             )
             val authSession = dbAuthSession.toAuthSession(accessToken)
-
             log.info("refresh - new authSession: $authSession")
 
             call.respond(HttpStatusCode.Created, ApiSuccessResponse(data = authSession))
         }
     }
+}
+
+fun Route.genAccessToken(
+    accountId: UUID, linkId: UUID, installationId: UUID, handle: String
+): String {
+    val log = KtorSimpleLogger("gen-access-token")
+    val twoHours = 60_000 * 120
+
+    val tokenSecret = environment.config.property("jwt.secret").getString()
+    val tokenIssuer = environment.config.property("jwt.issuer").getString()
+    val tokenAudience = environment.config.property("jwt.audience").getString()
+
+    log.info("gen-access-token - iss: $tokenIssuer, aud: $tokenAudience, handle: $handle")
+
+    // TODO startup check to "Ensure the length of the secret is at least 256 bit long"
+    return JWT.create()
+        .withAudience(tokenAudience)
+        .withIssuer(tokenIssuer)
+        .withClaim("handle", handle)
+        .withClaim("account_id", accountId.toString())
+        .withClaim("link_id", linkId.toString())
+        .withClaim("installation_id", installationId.toString())
+        .withExpiresAt(Date(System.currentTimeMillis() + twoHours))
+        .sign(Algorithm.HMAC256(tokenSecret))
 }

@@ -24,7 +24,7 @@ sealed interface RepoResult<out T : Any> {
 
     // NOTE / TODO: should also include 401
     data class ValidationError(
-        val errors: Errors? = null
+        val errors: Errors
     ) : RepoResult<Nothing> {
         override val loading = false
     }

@@ -89,6 +89,26 @@ output=$(curl -s -d '{"name":"User Name","secret":"secret12"}' -H "Challenge-Res
 echo "$output"
 export account_id=$(jq -r '.data.id' <<< "$output")
 echo "account_id: $account_id"
+export sess_id=$(jq -r '.hints.session.id' <<< "$output")
+echo "sess_id: $sess_id"
+export access_token=$(jq -r '.hints.session.access_token' <<< "$output")
+echo "access_token: $access_token"
+export refresh_token=$(jq -r '.hints.session.refresh_token' <<< "$output")
+echo "refresh_token: $refresh_token"
+```
+
+### Signup
+```shell
+output=$(curl -s -d '{"name":"Signup Name","secret":"secret12","email":"test@hotbling.wtf"}' -H "Installation-Id: $installation_id" -H "Content-Type: application/json" "$host/api/v1/accounts/signup")
+echo "$output"
+export account_id=$(jq -r '.data.id' <<< "$output")
+echo "account_id: $account_id"
+export sess_id=$(jq -r '.hints.session.id' <<< "$output")
+echo "sess_id: $sess_id"
+export access_token=$(jq -r '.hints.session.access_token' <<< "$output")
+echo "access_token: $access_token"
+export refresh_token=$(jq -r '.hints.session.refresh_token' <<< "$output")
+echo "refresh_token: $refresh_token"
 ```
 
 ## Installation Links Api

@@ -2,6 +2,7 @@ package app.mindspaces.clipboard.services
 
 import app.mindspaces.clipboard.api.ApiAuthSession
 import app.mindspaces.clipboard.plugins.DatabaseSingleton.tx
+import io.ktor.util.encodeBase64
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import org.jetbrains.exposed.dao.UUIDEntity
@@ -11,13 +12,12 @@ import org.jetbrains.exposed.dao.id.UUIDTable
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import java.util.UUID
+import kotlin.random.Random
 
 object AuthSessions : UUIDTable() {
     val accountId = reference("account_id", Accounts)
     val installationId = reference("installation_id", Installations)
-
-    // TODO ilid
-    val ioid = reference("ioid", InstallationLinks)
+    val linkId = reference("link_id", InstallationLinks)
     val secretUpdateId = reference("secret_update_id", SecretUpdates)
     val refreshToken = varchar("refresh_token", 100)
     val createdAt = timestamp("created_at").clientDefault {
@@ -31,7 +31,7 @@ class AuthSessionEntity(id: EntityID<UUID>) : UUIDEntity(id) {
 
     var accountId by AuthSessions.accountId
     var installationId by AuthSessions.installationId
-    var ioid by AuthSessions.ioid
+    var linkId by AuthSessions.linkId
     var secretUpdateId by AuthSessions.secretUpdateId
     var refreshToken by AuthSessions.refreshToken
     var createdAt by AuthSessions.createdAt
@@ -42,7 +42,7 @@ data class AuthSessionDAO(
     val id: UUID,
     val accountId: UUID,
     val installationId: UUID,
-    val ioid: UUID,
+    val linkId: UUID,
     val secretUpdateId: UUID,
     val refreshToken: String,
     val createdAt: Instant,
@@ -53,7 +53,7 @@ fun AuthSessionEntity.toDAO() = AuthSessionDAO(
     id.value,
     accountId.value,
     installationId.value,
-    ioid.value,
+    linkId.value,
     secretUpdateId.value,
     refreshToken,
     createdAt,
@@ -64,7 +64,7 @@ fun AuthSessionDAO.toAuthSession(accessToken: String) = ApiAuthSession(
     id,
     accountId,
     installationId,
-    ioid,
+    linkId,
     secretUpdateId,
     refreshToken,
     accessToken,
@@ -90,14 +90,16 @@ class AuthSessionsService {
     suspend fun create(
         accountId: UUID,
         installationId: UUID,
-        ioid: UUID,
-        secretUpdateId: UUID,
-        refreshToken: String
+        linkId: UUID,
+        secretUpdateId: UUID
     ): AuthSessionDAO = tx {
+        val refreshToken = Random.nextBytes(64).encodeBase64()
+        //val refreshToken = getRandomString(64, AlphaNumCharset)
+
         AuthSessionEntity.new {
             this.accountId = EntityID(accountId, Accounts)
             this.installationId = EntityID(installationId, Installations)
-            this.ioid = EntityID(ioid, InstallationLinks)
+            this.linkId = EntityID(linkId, InstallationLinks)
             this.secretUpdateId = EntityID(secretUpdateId, SecretUpdates)
             this.refreshToken = refreshToken
         }.toDAO()

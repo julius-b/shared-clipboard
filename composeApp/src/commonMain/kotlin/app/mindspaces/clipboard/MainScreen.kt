@@ -322,6 +322,7 @@ fun MainView(state: MainScreen.State, modifier: Modifier = Modifier) {
                                         fontWeight = FontWeight.Bold
                                     )
                                     Spacer(Modifier.height(2.dp))
+                                    // TODO "or login"
                                     Text("Create an account to share your clipboard entries with other devices")
                                     Spacer(Modifier.height(8.dp))
                                     TextButton(

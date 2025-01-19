@@ -1,7 +1,7 @@
 package app.mindspaces.clipboard.plugins
 
+import app.mindspaces.clipboard.api.ApiError
 import app.mindspaces.clipboard.api.ApiErrorResponse
-import app.mindspaces.clipboard.routes.SimpleValidationException
 import app.mindspaces.clipboard.routes.ValidationException
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
@@ -24,21 +24,21 @@ fun Application.configureAdministration() {
         exception<Throwable> { call, cause ->
             when (cause) {
                 // TODO provide get without ?, will return default resp
-                // TODO don't know field
+                // TODO don't know field, suboptimal response
                 is EntityNotFoundException -> {
-                    call.respond(HttpStatusCode.UnprocessableEntity, ApiErrorResponse())
-                }
-
-                is ValidationException -> {
                     call.respond(
-                        HttpStatusCode.UnprocessableEntity, ApiErrorResponse(
-                            errors = mapOf(cause.field to cause.errors)
-                        )
+                        HttpStatusCode.UnprocessableEntity,
+                        ApiErrorResponse(mapOf("entity" to arrayOf(ApiError.Reference())))
                     )
                 }
 
-                is SimpleValidationException -> {
-                    //call.respond(HttpStat)
+                is ValidationException -> {
+                    val status =
+                        if (cause.errors.any { it is ApiError.Conflict }) HttpStatusCode.Conflict
+                        else if (cause.errors.any { it is ApiError.Unauthenticated }) HttpStatusCode.Unauthorized
+                        else if (cause.errors.any { it is ApiError.Forbidden }) HttpStatusCode.Forbidden
+                        else HttpStatusCode.UnprocessableEntity
+                    call.respond(status, ApiErrorResponse(mapOf(cause.field to cause.errors)))
                 }
 
                 else -> {

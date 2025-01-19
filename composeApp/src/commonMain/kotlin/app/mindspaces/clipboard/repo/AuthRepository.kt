@@ -3,19 +3,16 @@ package app.mindspaces.clipboard.repo
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToOneOrNull
 import app.mindspaces.clipboard.api.AccountHints
-import app.mindspaces.clipboard.api.AccountParams
-import app.mindspaces.clipboard.api.AccountPropertyParams
 import app.mindspaces.clipboard.api.Accounts
 import app.mindspaces.clipboard.api.ApiAccount
 import app.mindspaces.clipboard.api.ApiAccountProperty
 import app.mindspaces.clipboard.api.ApiAuthSession
 import app.mindspaces.clipboard.api.ApiErrorResponse
-import app.mindspaces.clipboard.api.ApiSuccessResponse
 import app.mindspaces.clipboard.api.AuthHints
 import app.mindspaces.clipboard.api.AuthSessionParams
 import app.mindspaces.clipboard.api.AuthSessions
 import app.mindspaces.clipboard.api.HintedApiSuccessResponse
-import app.mindspaces.clipboard.api.KeyChallengeResponse
+import app.mindspaces.clipboard.api.SignupParams
 import app.mindspaces.clipboard.api.toEntity
 import app.mindspaces.clipboard.db.Account
 import app.mindspaces.clipboard.db.AccountProperty
@@ -27,7 +24,6 @@ import io.ktor.client.call.body
 import io.ktor.client.plugins.auth.authProvider
 import io.ktor.client.plugins.auth.providers.BearerAuthProvider
 import io.ktor.client.plugins.resources.post
-import io.ktor.client.request.header
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
@@ -72,7 +68,7 @@ class AuthRepository(private val db: Database, private val client: HttpClient) {
                 props.forEach(accountPropertyQueries::insert)
             }
 
-            // clean token so loadTokens is refreshed
+            // force ktor-client to re-initialize auth state
             log.d { "login - clearing tokens..." }
             client.authProvider<BearerAuthProvider>()?.clearToken()
 
@@ -83,42 +79,12 @@ class AuthRepository(private val db: Database, private val client: HttpClient) {
         }
     }
 
-    // @persist: false during auth
-    suspend fun createProperty(content: String): RepoResult<ApiAccountProperty> {
-        log.i { "create-property - content: $content" }
-        try {
-            val resp = client.post(Accounts.Properties()) {
-                contentType(ContentType.Application.Json)
-                setBody(AccountPropertyParams(content))
-            }
-            if (!resp.status.isSuccess()) {
-                val err = resp.body<ApiErrorResponse>()
-                return RepoResult.ValidationError(err.errors)
-            }
-            val success = resp.body<ApiSuccessResponse<ApiAccountProperty>>()
-            // NOTE: accountId is null
-            val prop = success.data
-            return RepoResult.Data(prop)
-        } catch (e: Throwable) {
-            log.e(e) { "create-prop - unexpected resp: $e" }
-            return RepoResult.NetworkError
-        }
-    }
-
-    suspend fun signup(
-        name: String,
-        secret: String,
-        properties: List<ApiAccountProperty>
-    ): RepoResult<AccountResult> {
+    suspend fun signup(name: String, secret: String, email: String): RepoResult<AccountResult> {
         log.i { "signup - name: $name" }
         try {
-            val resp = client.post(Accounts()) {
+            val resp = client.post(Accounts.Signup()) {
                 contentType(ContentType.Application.Json)
-                setBody(AccountParams(name, secret))
-
-                for (prop in properties) {
-                    header(KeyChallengeResponse, "${prop.id}=${prop.verificationCode}")
-                }
+                setBody(SignupParams(name, secret, email))
             }
             if (!resp.status.isSuccess()) {
                 val err = resp.body<ApiErrorResponse>()
@@ -126,13 +92,21 @@ class AuthRepository(private val db: Database, private val client: HttpClient) {
             }
             val success = resp.body<HintedApiSuccessResponse<ApiAccount, AccountHints>>()
             val validatedProperties = success.hints.properties.map(ApiAccountProperty::toEntity)
+            val session = success.hints.session.toEntity()
             val account = success.data.toEntity()
+            log.i { "signup - got session: $session" }
             db.transaction {
                 // should never cause conflicts since db is cleared before insert
-                // TODO clea db before insert
+                // TODO clean db before insert
                 validatedProperties.forEach(accountPropertyQueries::insert)
                 accountQueries.insert(account)
+                authSessionQueries.insert(session)
             }
+
+            // force ktor-client to re-initialize auth state
+            log.d { "signup - clearing tokens..." }
+            client.authProvider<BearerAuthProvider>()?.clearToken()
+
             return RepoResult.Data(AccountResult(account, validatedProperties))
         } catch (e: Throwable) {
             log.e(e) { "signup - unexpected resp: $e" }

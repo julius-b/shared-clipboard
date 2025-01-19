@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS authSession (
   id TEXT AS UUID PRIMARY KEY NOT NULL,
   account_id TEXT AS UUID NOT NULL,
   installation_id TEXT AS UUID NOT NULL,
-  ioid TEXT AS UUID NOT NULL,
+  link_id TEXT AS UUID NOT NULL,
   secret_update_id TEXT AS UUID NOT NULL,
   refresh_token text NOT NULL,
   access_token text NOT NULL,
@@ -14,19 +14,19 @@ CREATE TABLE IF NOT EXISTS authSession (
 );
 
 insert:
-INSERT OR REPLACE INTO authSession (id, account_id, installation_id, ioid, secret_update_id, refresh_token, access_token, created_at) VALUES ?;
+INSERT OR REPLACE INTO authSession (id, account_id, installation_id, link_id, secret_update_id, refresh_token, access_token, created_at) VALUES ?;
 -- (?, ?, ?, ?, ?, ?, ?, ?)
 
 getLatest:
 SELECT * FROM authSession WHERE created_at = (SELECT max(created_at) FROM authSession) AND deleted_at IS NULL;
 
-getLatestByIOID:
-SELECT * FROM authSession WHERE created_at = (SELECT max(created_at) FROM authSession) AND ioid = :ioid AND deleted_at IS NULL;
+getLatestByLinkId:
+SELECT * FROM authSession WHERE created_at = (SELECT max(created_at) FROM authSession) AND link_id = :link_id AND deleted_at IS NULL;
 
 -- select rows with maximum values in each group
--- should return latest auth_session per ioid
-getLatestByDistinctIOID:
-SELECT account_id, ioid, max(created_at) FROM authSession WHERE deleted_at IS NULL GROUP BY ioid;
+-- should return latest auth_session per link_id
+getLatestByDistinctLinkId:
+SELECT account_id, link_id, max(created_at) FROM authSession WHERE deleted_at IS NULL GROUP BY link_id;
 
 truncate:
 DELETE FROM authSession;

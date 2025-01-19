@@ -9,7 +9,7 @@ data class ApiAuthSession(
     val id: SUUID,
     @SerialName("account_id") val accountId: SUUID,
     @SerialName("installation_id") val installationId: SUUID,
-    val ioid: SUUID,
+    @SerialName("link_id") val linkId: SUUID,
     @SerialName("secret_update_id") val secretUpdateId: SUUID,
     @SerialName("refresh_token") val refreshToken: String,
     @SerialName("access_token") val accessToken: String,
@@ -22,12 +22,7 @@ data class AuthSessionParams(
     val unique: String,
     val secret: String,
     @SerialName("cap_chat") val capChat: Boolean,
-    val ioid: SUUID? = null
-)
-
-@Serializable
-data class AccountHints(
-    val properties: List<ApiAccountProperty>
+    @SerialName("link_id") val linkId: SUUID? = null
 )
 
 @Serializable

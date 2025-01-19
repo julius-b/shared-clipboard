@@ -3,7 +3,12 @@ package app.mindspaces.clipboard.services
 import app.mindspaces.clipboard.api.ApiAccount
 import app.mindspaces.clipboard.api.ApiAccount.Auth
 import app.mindspaces.clipboard.api.ApiAccount.Type
+import app.mindspaces.clipboard.api.ApiAccountProperty
+import app.mindspaces.clipboard.api.ApiError
+import app.mindspaces.clipboard.api.KeyChallengeResponse
 import app.mindspaces.clipboard.plugins.DatabaseSingleton.tx
+import app.mindspaces.clipboard.routes.ValidationException
+import io.ktor.util.logging.KtorSimpleLogger
 import kotlinx.datetime.Clock
 import org.jetbrains.exposed.dao.UUIDEntity
 import org.jetbrains.exposed.dao.UUIDEntityClass
@@ -16,12 +21,12 @@ import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import java.util.UUID
 
 // max db width
-const val handleWidth = 36
+const val HandleMaxLength = 36
 
 object Accounts : UUIDTable() {
     val type = enumerationByName<Type>("type", 10).default(Type.Account)
     val auth = enumerationByName<Auth>("auth", 10).default(Auth.Default)
-    val handle = varchar("handle", handleWidth)
+    val handle = varchar("handle", HandleMaxLength)
     val name = varchar("name", 50)
     val desc = varchar("desc", 250).nullable()
     val secret = varchar("secret", 1000)
@@ -88,6 +93,8 @@ class SecretUpdateEntity(id: EntityID<UUID>) : UUIDEntity(id) {
 }
 
 class AccountsService {
+    private val log = KtorSimpleLogger("accounts-svc")
+
     // TODO filter deletedAt
     suspend fun all(): List<ApiAccount> = tx {
         AccountEntity.all().map(AccountEntity::toDTO)
@@ -104,12 +111,34 @@ class AccountsService {
             ?.toDTO()
     }
 
-    suspend fun create(handle: String, name: String, secret: String): ApiAccount = tx {
-        AccountEntity.new {
+    suspend fun create(
+        handle: String, name: String, secret: String, properties: MutableList<ApiAccountProperty>
+    ): ApiAccount = tx {
+        val account = AccountEntity.new {
             this.handle = handle.sanitizeHandle()
             this.name = name.sanitizeName()
             this.secret = secret.sanitizeSecret()
-        }.toDTO()
+        }
+
+        // ensure account.new tx only succeeds when properties are linked successfully
+        for (i in 0 until properties.size) {
+            // TODO use ownAndPrimarizeProperty, but nested suspend tx not possible
+            properties[i] = AccountPropertyEntity.findByIdAndUpdate(properties[i].id) {
+                it.accountId = account.id
+                it.primary = true
+            }?.toDTO() ?: throw ValidationException(
+                KeyChallengeResponse, ApiError.Reference(properties[i].id.toString())
+            )
+        }
+
+        // TODO use createSecretUpdate, but nested suspend tx not possible
+        val secretUpdate = SecretUpdateEntity.new {
+            this.accountId = account.id
+            this.secret = secret.sanitizeSecret()
+        }
+        log.info("create - secret-update: $secretUpdate")
+
+        account.toDTO()
     }
 
     // TODO Entity syntax
@@ -117,7 +146,7 @@ class AccountsService {
         Accounts.deleteWhere { Accounts.id eq id } > 0
     }
 
-    suspend fun createSecretUpdate(accountId: UUID, secret: String): Unit = tx {
+    private suspend fun createSecretUpdate(accountId: UUID, secret: String): Unit = tx {
         SecretUpdateEntity.new {
             this.accountId = EntityID(accountId, Accounts)
             this.secret = secret.sanitizeSecret()
@@ -133,7 +162,6 @@ class AccountsService {
     }
 }
 
-fun String.sanitizeUnique() = this.sanitizeHandle()
 fun String.sanitizeHandle() = this.trim().lowercase()
 fun String.sanitizeSecret() = this.trim().replaceFirstChar { it.lowercaseChar() }
 fun String.sanitizeName() = this.trim()
