@@ -11,6 +11,7 @@ import app.mindspaces.clipboard.api.ApiSuccessResponse
 import app.mindspaces.clipboard.api.HintedApiSuccessResponse
 import app.mindspaces.clipboard.api.KeyChallengeResponse
 import app.mindspaces.clipboard.api.KeyInstallationID
+import app.mindspaces.clipboard.api.MinSecretSize
 import app.mindspaces.clipboard.api.SignupParams
 import app.mindspaces.clipboard.services.accountLinksService
 import app.mindspaces.clipboard.services.accountPropertiesService
@@ -250,8 +251,10 @@ suspend fun createAccount(
     //if (handle.length < 3 || handle.length > HandleMaxLength) throw ValidationException(Code.Constraint, "handle")
     if (name.isEmpty() || name.length > 50)
         throw ValidationException("name", ApiError.Constraint(name, min = 1, max = 50))
-    if (secret.length < 8)
-        throw ValidationException("secret", ApiError.Constraint(secret, min = 8))
+    if (secret.length < MinSecretSize)
+        throw ValidationException(
+            "secret", ApiError.Constraint(secret, min = MinSecretSize.toLong())
+        )
 
     // TODO properties: possibly multiple of the same type, only primarize one
     return accountsService.create(handle, name, secret, properties)

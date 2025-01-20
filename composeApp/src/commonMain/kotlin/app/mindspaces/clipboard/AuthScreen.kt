@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import app.mindspaces.clipboard.AuthScreen.Event.Authenticate
 import app.mindspaces.clipboard.AuthScreen.Event.Back
 import app.mindspaces.clipboard.AuthScreen.Event.Login
+import app.mindspaces.clipboard.api.MinSecretSize
 import app.mindspaces.clipboard.components.SecretInputField
 import app.mindspaces.clipboard.components.SimpleInputField
 import app.mindspaces.clipboard.parcel.CommonParcelize
@@ -159,10 +160,7 @@ fun AuthView(state: AuthScreen.State, modifier: Modifier = Modifier) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     "Create Account".uppercase(),
-                    //modifier = Modifier.fillMaxWidth(),
-                    //color = Color.Black,
                     fontSize = 24.sp,
-                    //fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily(Font(Res.font.Anton_Regular))
                 )
             }
@@ -198,13 +196,13 @@ fun AuthView(state: AuthScreen.State, modifier: Modifier = Modifier) {
                 )
 
                 var secret by rememberRetained { mutableStateOf("") }
-                val secretValid = secret.length >= minSecretSize
+                val secretValid = secret.length >= MinSecretSize
                 SecretInputField(
                     label = "Password",
                     value = secret,
                     valid = secretValid,
                     onValueChanged = { secret = it },
-                    errorText = "minimum $minSecretSize characters"
+                    errorText = "minimum $MinSecretSize characters"
                 )
 
                 Spacer(Modifier.height(24.dp))

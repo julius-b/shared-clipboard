@@ -104,7 +104,7 @@ fun Application.configureSockets() {
                 }!!
                 msg(Notice("config - accountChat=$accountChan"))
 
-                val links = installationsService.allLinks()
+                val links = installationsService.listLinks(accountId)
                 log.info("[$accountId/$handle]: links: #${links.size}")
                 msg(Devices(links))
 

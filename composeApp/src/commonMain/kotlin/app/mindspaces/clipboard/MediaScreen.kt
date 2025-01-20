@@ -162,9 +162,7 @@ fun MediaView(state: MediaScreen.State, modifier: Modifier = Modifier) {
                 title = {
                     Text(
                         state.title.uppercase(),
-                        //color = Color.Black,
                         fontSize = 24.sp,
-                        //fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily(Font(Res.font.Anton_Regular))
                     )
                 },
@@ -178,20 +176,19 @@ fun MediaView(state: MediaScreen.State, modifier: Modifier = Modifier) {
                 }
             )
         }
-    ) {
+    ) { innerPadding ->
         // TODO DI (LocalPlatformContext...)
         val platformContext = LocalPlatformContext.current
         val imageLoader = rememberRetained {
             ImageLoader.Builder(platformContext).components {
                 add(Fetcher.Factory<ThumbFetcherCoilModel> { data, options, imageLoader ->
-                    ThumbFetcher(
-                        data
-                    )
+                    ThumbFetcher(data)
                 })
             }.build()
         }
 
         LazyVerticalGrid(
+            modifier = Modifier.padding(innerPadding),
             columns = GridCells.Adaptive(140.dp)
         ) {
             // TODO contentType, in flow insert header?

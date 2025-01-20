@@ -10,9 +10,9 @@ import app.mindspaces.clipboard.api.InstallationParams
 import app.mindspaces.clipboard.api.Installations
 import app.mindspaces.clipboard.api.KeyInstallationID
 import app.mindspaces.clipboard.api.toEntity
+import app.mindspaces.clipboard.db.AllLinks
 import app.mindspaces.clipboard.db.Database
 import app.mindspaces.clipboard.db.Installation
-import app.mindspaces.clipboard.db.InstallationLink
 import app.mindspaces.clipboard.getPlatform
 import co.touchlab.kermit.Logger
 import io.ktor.client.HttpClient
@@ -77,13 +77,20 @@ class InstallationRepository(db: Database, private val client: HttpClient) {
 
     fun saveLinks(links: List<ApiInstallationLink>) {
         installationQueries.transaction {
+            val self = installationQueries.getSelf().executeAsOne()
+
             for (link in links) {
+                // link might have a new name
                 installationQueries.insertLink(link.toEntity())
+                // don't override self from server, local installation info is only _sent_
+                if (self.id != link.installationId) {
+                    installationQueries.insert(link.installation.toEntity(false))
+                }
             }
         }
     }
 
-    fun allLinks(): Flow<List<InstallationLink>> {
+    fun allLinks(): Flow<List<AllLinks>> {
         return installationQueries.allLinks().asFlow().mapToList(Dispatchers.IO)
             .distinctUntilChanged()
     }

@@ -85,6 +85,9 @@ class RealTimeClient(
             is Message.Devices -> {
                 val devices = msg.devices
                 log.i { "received devices list, saving (${devices.size}): $devices" }
+                for (device in devices) {
+                    log.i { "- device: $device" }
+                }
                 installationRepository.saveLinks(devices)
             }
         }

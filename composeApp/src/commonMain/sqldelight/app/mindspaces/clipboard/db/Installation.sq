@@ -45,7 +45,9 @@ insertLink:
 INSERT OR REPLACE INTO installationLink (id, name, account_id, installation_id, created_at, deleted_at) VALUES ?;
 
 allLinks:
-SELECT * FROM installationLink;
+SELECT * FROM installationLink
+JOIN installation ON installation.id = installationLink.installation_id AND installation.self = 1
+WHERE deleted_at IS NULL;
 
 truncateLinks:
 DELETE FROM installationLink;

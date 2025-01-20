@@ -5,6 +5,8 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 
+const val MinSecretSize = 8
+
 @Serializable
 data class ApiAccount(
     val id: SUUID,

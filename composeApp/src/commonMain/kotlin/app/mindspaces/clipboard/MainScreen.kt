@@ -11,9 +11,11 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -26,6 +28,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.AddCircle
+import androidx.compose.material.icons.rounded.Phone
 import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Card
@@ -43,6 +48,7 @@ import androidx.compose.material3.SuggestionChipDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -60,11 +66,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.mindspaces.clipboard.MainScreen.Event.AddAccount
-import app.mindspaces.clipboard.MainScreen.Event.CreateAccount
 import app.mindspaces.clipboard.MainScreen.Event.CreateNote
 import app.mindspaces.clipboard.MainScreen.Event.RequestStoragePermission
 import app.mindspaces.clipboard.MainScreen.Event.ToggleAddNote
-import app.mindspaces.clipboard.MainScreen.Event.ViewAllMedia
+import app.mindspaces.clipboard.MainScreen.Event.ViewAllDevices
+import app.mindspaces.clipboard.MainScreen.Event.ViewAllMedias
+import app.mindspaces.clipboard.MainScreen.Event.ViewSettings
 import app.mindspaces.clipboard.data.Permission
 import app.mindspaces.clipboard.data.PermissionState
 import app.mindspaces.clipboard.data.ThumbFetcher
@@ -72,8 +79,8 @@ import app.mindspaces.clipboard.data.ThumbFetcherCoilModel
 import app.mindspaces.clipboard.data.isGranted
 import app.mindspaces.clipboard.data.rememberPermissionState
 import app.mindspaces.clipboard.db.Account
+import app.mindspaces.clipboard.db.AllLinks
 import app.mindspaces.clipboard.db.Clip
-import app.mindspaces.clipboard.db.InstallationLink
 import app.mindspaces.clipboard.db.Media
 import app.mindspaces.clipboard.db.Note
 import app.mindspaces.clipboard.parcel.CommonParcelize
@@ -112,14 +119,12 @@ import sharedclipboard.composeapp.generated.resources.Res
 import software.amazon.lastmile.kotlin.inject.anvil.AppScope
 import java.util.UUID
 
-const val minSecretSize = 8
-
 @CommonParcelize
 data object MainScreen : Screen {
     data class State(
         val self: Account?,
         val notes: List<Note>,
-        val devices: List<InstallationLink>,
+        val devices: List<AllLinks>,
         val recents: List<Media>,
         val storagePermission: PermissionState,
         val addNote: AddNoteModal?,
@@ -131,9 +136,10 @@ data object MainScreen : Screen {
         data object ToggleAddNote : Event
         data class CreateNote(val text: String) : Event
         data object AddAccount : Event
-        data class CreateAccount(val name: String, val email: String, val secret: String) : Event
         data object RequestStoragePermission : Event
-        data object ViewAllMedia : Event
+        data object ViewSettings : Event
+        data object ViewAllMedias : Event
+        data object ViewAllDevices : Event
     }
 }
 
@@ -209,13 +215,11 @@ class MainPresenter(
                     addNote = null
                 }
 
-                is CreateAccount -> {
-
-                }
-
                 is AddAccount -> navigator.goTo(AuthScreen)
                 is RequestStoragePermission -> storagePermission.launchPermissionRequest()
-                is ViewAllMedia -> navigator.goTo(MediaScreen())
+                is ViewSettings -> navigator.goTo(SettingsScreen)
+                is ViewAllMedias -> navigator.goTo(MediaScreen())
+                is ViewAllDevices -> navigator.goTo(DeviceScreen)
             }
         }
     }
@@ -226,24 +230,29 @@ class MainPresenter(
 fun MainView(state: MainScreen.State, modifier: Modifier = Modifier) {
     AddNoteOverlay(state)
 
-    //if (state.shared != null) {
-    //    AddNoteOverlay(state, initial = state.shared)
-    //}
-
     Scaffold(
         topBar = {
-            Row(
-                modifier = Modifier.padding(top = 18.dp, start = 18.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    "Access Anywhere".uppercase(),
-                    //color = Color.Black,
-                    fontSize = 24.sp,
-                    //fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily(Font(Res.font.Anton_Regular))
-                )
-            }
+            // TODO global style for TopAppBar text
+            TopAppBar(
+                title = {
+                    Text(
+                        "Access Anywhere".uppercase(),
+                        fontSize = 24.sp,
+                        fontFamily = FontFamily(Font(Res.font.Anton_Regular))
+                    )
+                },
+                actions = {
+                    IconButton(onClick = {
+                        state.eventSink(ViewSettings)
+                    }) {
+                        Icon(
+                            modifier = Modifier.fillMaxHeight(),
+                            imageVector = Icons.Filled.Settings,
+                            contentDescription = "Settings"
+                        )
+                    }
+                }
+            )
         },
         floatingActionButton = {
             FloatingActionButton(onClick = {
@@ -258,14 +267,12 @@ fun MainView(state: MainScreen.State, modifier: Modifier = Modifier) {
         val imageLoader = rememberRetained {
             ImageLoader.Builder(platformContext).components {
                 add(Fetcher.Factory<ThumbFetcherCoilModel> { data, options, imageLoader ->
-                    ThumbFetcher(
-                        data
-                    )
+                    ThumbFetcher(data)
                 })
             }.build()
         }
         Column(
-            modifier = modifier.fillMaxSize().padding(innerPadding).padding(16.dp),
+            modifier = modifier.fillMaxSize().padding(innerPadding).padding(horizontal = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Column(
@@ -324,19 +331,69 @@ fun MainView(state: MainScreen.State, modifier: Modifier = Modifier) {
                                 }
                             }
 
-                            state.devices.size < 2 -> {
+                            else -> {
                                 InfoCard {
+                                    // TODO show info text when this device is the only device
                                     Text(
-                                        "No devices connected",
+                                        "Devices",
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold
                                     )
                                     Spacer(Modifier.height(2.dp))
+                                    //Text("These devices have access to files on this device:")
+                                    LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
+                                        items(state.devices) { device ->
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(device.deviceName())
+                                                // TODO better icon
+                                                Icon(
+                                                    modifier = Modifier.padding(horizontal = 6.dp),
+                                                    imageVector = Icons.Rounded.Phone,
+                                                    contentDescription = ""
+                                                )
+                                                Spacer(Modifier.weight(1f))
+                                                if (device.self) {
+                                                    SuggestionChip(
+                                                        onClick = { },
+                                                        // TODO remove black border
+                                                        enabled = true,
+                                                        label = {
+                                                            Text("this device")
+                                                        },
+                                                        colors = SuggestionChipDefaults.suggestionChipColors(
+                                                            //containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                                        ),
+                                                        //modifier = Modifier.align(Alignment.End)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        // TODO modal: to add a device: download on windows, use your account: bla
+                                        IconButton(
+                                            onClick = {}
+                                        ) {
+                                            Icon(
+                                                Icons.Outlined.AddCircle,
+                                                contentDescription = "Add device",
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                        TextButton(
+                                            onClick = {
+                                                state.eventSink(ViewAllDevices)
+                                            },
+                                            shape = ShapeDefaults.Medium
+                                        ) { Text("View All") }
+                                    }
                                 }
-                            }
-
-                            else -> {
-                                Text("TODO check if no devices added yet")
                             }
                         }
                     }
@@ -446,7 +503,7 @@ fun MainView(state: MainScreen.State, modifier: Modifier = Modifier) {
                                 //HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), thickness = 4.dp)
                                 TextButton(
                                     onClick = {
-                                        state.eventSink(ViewAllMedia)
+                                        state.eventSink(ViewAllMedias)
                                     },
                                     shape = ShapeDefaults.Medium,
                                     modifier = Modifier.align(Alignment.End)

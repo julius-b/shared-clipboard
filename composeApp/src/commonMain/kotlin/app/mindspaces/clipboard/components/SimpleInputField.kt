@@ -18,7 +18,8 @@ fun SimpleInputField(
     value: String,
     valid: Boolean,
     onValueChange: (String) -> Unit,
-    errorText: String = "required"
+    errorText: String = "required",
+    modifier: Modifier = Modifier.fillMaxWidth()
 ) {
     var wasFocused by rememberRetained { mutableStateOf(false) }
     var touched by rememberRetained { mutableStateOf(false) }
@@ -30,7 +31,7 @@ fun SimpleInputField(
             // NOTE: consider only setting error after leaving focus
             //touched = true
         },
-        modifier = Modifier.fillMaxWidth().onFocusChanged { focusState ->
+        modifier = modifier.onFocusChanged { focusState ->
             if (focusState.isFocused) wasFocused = true
             if (!focusState.isFocused && wasFocused) touched = true
         },

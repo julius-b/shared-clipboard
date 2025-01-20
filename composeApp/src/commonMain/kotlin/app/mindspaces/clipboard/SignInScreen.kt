@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.sp
 import app.mindspaces.clipboard.SignInScreen.Event.Authenticate
 import app.mindspaces.clipboard.SignInScreen.Event.Back
 import app.mindspaces.clipboard.api.ApiError
+import app.mindspaces.clipboard.api.MinSecretSize
 import app.mindspaces.clipboard.components.SecretInputField
 import app.mindspaces.clipboard.components.SimpleInputField
 import app.mindspaces.clipboard.parcel.CommonParcelize
@@ -173,10 +174,7 @@ fun SignInView(state: SignInScreen.State, modifier: Modifier = Modifier) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     "Login".uppercase(),
-                    //modifier = Modifier.fillMaxWidth(),
-                    //color = Color.Black,
                     fontSize = 24.sp,
-                    //fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily(Font(Res.font.Anton_Regular))
                 )
             }
@@ -197,13 +195,13 @@ fun SignInView(state: SignInScreen.State, modifier: Modifier = Modifier) {
                 )
 
                 var secret by rememberRetained { mutableStateOf("") }
-                val secretValid = secret.length >= minSecretSize
+                val secretValid = secret.length >= MinSecretSize
                 SecretInputField(
                     label = "Password",
                     value = secret,
                     valid = secretValid,
                     onValueChanged = { secret = it },
-                    errorText = "minimum $minSecretSize characters"
+                    errorText = "minimum $MinSecretSize characters"
                 )
 
                 Spacer(Modifier.height(16.dp))
