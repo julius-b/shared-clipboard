@@ -52,17 +52,18 @@ SELECT * FROM media ORDER BY mod DESC;
 
 -- TODO hasprefix (clickig on parent dir also shows all from subdir) vs dir==dir
 files:
-SELECT * FROM media WHERE dir = ? ORDER BY mod DESC;
+SELECT * FROM media WHERE dir = ? AND installation_id = ? ORDER BY mod DESC;
 
+-- use `IS` to match 2x NULL as true
 directories:
 SELECT outer.*
 FROM media AS outer
 JOIN (
-    SELECT dir, MAX(mod) AS max_mod
+    SELECT installation_id, dir, MAX(mod) AS max_mod
     FROM media
-    GROUP BY dir
+    GROUP BY installation_id, dir
 ) AS inner
-ON outer.dir = inner.dir AND outer.mod = inner.max_mod
+ON outer.installation_id IS inner.installation_id AND outer.dir = inner.dir AND outer.mod = inner.max_mod
 ORDER BY outer.mod DESC;
 -- slow:
 -- SELECT *

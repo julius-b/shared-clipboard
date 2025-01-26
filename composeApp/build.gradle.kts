@@ -72,6 +72,7 @@ kotlin {
             implementation(libs.sqldelight.coroutines.extensions)
             implementation(libs.appdirs)
             implementation(libs.coil)
+            implementation(libs.coil.network.ktor3)
             implementation(libs.thumbnailator)
             implementation(libs.kermit)
             implementation(libs.kotlin.inject.runtime)

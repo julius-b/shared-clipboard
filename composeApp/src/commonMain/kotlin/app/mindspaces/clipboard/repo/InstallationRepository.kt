@@ -2,6 +2,7 @@ package app.mindspaces.clipboard.repo
 
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
+import app.cash.sqldelight.coroutines.mapToOneOrNull
 import app.mindspaces.clipboard.api.ApiErrorResponse
 import app.mindspaces.clipboard.api.ApiInstallation
 import app.mindspaces.clipboard.api.ApiInstallationLink
@@ -45,6 +46,9 @@ class InstallationRepository(db: Database, private val client: HttpClient) {
 
     private val installationQueries = db.installationQueries
 
+    // sync lock
+    private val mutex = Mutex()
+
     init {
         log.d { "init $this (db: $db, client: $client)" }
 
@@ -75,7 +79,8 @@ class InstallationRepository(db: Database, private val client: HttpClient) {
         }
     }
 
-    private val mutex = Mutex()
+    fun self() =
+        installationQueries.getSelf().asFlow().mapToOneOrNull(Dispatchers.IO).distinctUntilChanged()
 
     fun saveLinks(links: List<ApiInstallationLink>) {
         installationQueries.transaction {
@@ -142,7 +147,6 @@ class InstallationRepository(db: Database, private val client: HttpClient) {
                 attributes.put(InstallationCircuitBreaker, Unit)
             }
             if (resp.status.isSuccess()) {
-                // ensure response can be parsed
                 val success = resp.body<ApiSuccessResponse<ApiInstallation>>()
                 val installation = success.data.toEntity(true)
 

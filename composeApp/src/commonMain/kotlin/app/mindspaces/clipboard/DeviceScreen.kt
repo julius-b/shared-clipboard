@@ -164,7 +164,7 @@ class DevicePresenter(
                         log.e { "cancel-edit - illegal state: ${states[event.id]}..." }
                         return@State
                     }
-                    states.remove(event.id)
+                    states -= event.id
                 }
 
                 is Back -> navigator.pop()

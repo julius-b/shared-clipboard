@@ -3,6 +3,7 @@ package app.mindspaces.clipboard.di
 import app.mindspaces.clipboard.ClipboardApp
 import app.mindspaces.clipboard.db.DriverFactory
 import co.touchlab.kermit.Logger
+import coil3.PlatformContext
 import me.tatarka.inject.annotations.Component
 import software.amazon.lastmile.kotlin.inject.anvil.AppScope
 import software.amazon.lastmile.kotlin.inject.anvil.MergeComponent
@@ -21,6 +22,8 @@ abstract class DesktopApplicationComponent : SharedApplicationComponent,
     abstract val clipboardApp: ClipboardApp
 
     override fun getDriverFactory() = DriverFactory()
+
+    override fun providePlatformContext(): PlatformContext = PlatformContext.INSTANCE
 
     companion object
 }

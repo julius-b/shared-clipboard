@@ -74,8 +74,6 @@ import app.mindspaces.clipboard.MainScreen.Event.ViewAllMedias
 import app.mindspaces.clipboard.MainScreen.Event.ViewSettings
 import app.mindspaces.clipboard.data.Permission
 import app.mindspaces.clipboard.data.PermissionState
-import app.mindspaces.clipboard.data.ThumbFetcher
-import app.mindspaces.clipboard.data.ThumbFetcherCoilModel
 import app.mindspaces.clipboard.data.isGranted
 import app.mindspaces.clipboard.data.rememberPermissionState
 import app.mindspaces.clipboard.db.Account
@@ -88,13 +86,8 @@ import app.mindspaces.clipboard.repo.AuthRepository
 import app.mindspaces.clipboard.repo.InstallationRepository
 import app.mindspaces.clipboard.repo.MediaRepository
 import app.mindspaces.clipboard.repo.NoteRepository
-import ca.gosyer.appdirs.AppDirs
 import co.touchlab.kermit.Logger
-import coil3.ImageLoader
 import coil3.compose.AsyncImage
-import coil3.compose.LocalPlatformContext
-import coil3.fetch.Fetcher
-import coil3.request.ImageRequest
 import com.slack.circuit.codegen.annotations.CircuitInject
 import com.slack.circuit.retained.collectAsRetainedState
 import com.slack.circuit.retained.rememberRetained
@@ -128,7 +121,6 @@ data object MainScreen : Screen {
         val recents: List<Media>,
         val storagePermission: PermissionState,
         val addNote: AddNoteModal?,
-        val getAppDirs: () -> AppDirs,
         val eventSink: (Event) -> Unit
     ) : CircuitUiState
 
@@ -159,8 +151,7 @@ class MainPresenter(
     private val authRepository: AuthRepository,
     private val installationRepository: InstallationRepository,
     private val noteRepository: NoteRepository,
-    private val mediaRepository: MediaRepository,
-    private val appDirs: AppDirs
+    private val mediaRepository: MediaRepository
 ) : Presenter<MainScreen.State> {
     private val log = Logger.withTag("MainScreen")
 
@@ -198,8 +189,7 @@ class MainPresenter(
             devices,
             recents,
             storagePermission,
-            addNote,
-            { appDirs }
+            addNote
         ) { event ->
             when (event) {
                 is ToggleAddNote -> {
@@ -262,15 +252,6 @@ fun MainView(state: MainScreen.State, modifier: Modifier = Modifier) {
             }
         }
     ) { innerPadding ->
-        // TODO DI (LocalPlatformContext...)
-        val platformContext = LocalPlatformContext.current
-        val imageLoader = rememberRetained {
-            ImageLoader.Builder(platformContext).components {
-                add(Fetcher.Factory<ThumbFetcherCoilModel> { data, options, imageLoader ->
-                    ThumbFetcher(data)
-                })
-            }.build()
-        }
         Column(
             modifier = modifier.fillMaxSize().padding(innerPadding).padding(horizontal = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -400,7 +381,9 @@ fun MainView(state: MainScreen.State, modifier: Modifier = Modifier) {
                     item {
                         Card(
                             modifier = Modifier.fillMaxWidth(),
-                            onClick = {}
+                            onClick = {
+                                state.eventSink(ViewAllMedias)
+                            }
                         ) {
                             Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
                                 Text(
@@ -410,33 +393,6 @@ fun MainView(state: MainScreen.State, modifier: Modifier = Modifier) {
                                 )
                                 Spacer(Modifier.height(8.dp))
                                 // exactly 2 rows, not a grid
-                                /*for (i in 0..1) {
-                                    Row(
-                                        modifier = Modifier.height(64.dp).fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceEvenly
-                                    ) {
-                                        for (k in 0..4) {
-                                            // TODO accepts Bitmap
-                                            Image(
-                                                painter = painterResource(resource = Res.drawable.compose_multiplatform),
-                                                contentDescription = ""
-                                            )
-                                        }
-                                    }
-                                }
-                                LazyHorizontalGrid(
-                                    modifier = Modifier.height(240.dp).fillMaxWidth(),
-                                    rows = GridCells.Fixed(2),
-                                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                                ) {
-                                    items(8) {
-                                        Image(
-                                            painter = painterResource(resource = Res.drawable.compose_multiplatform),
-                                            contentDescription = ""
-                                        )
-                                    }
-                                }*/
                                 // 8x2 max elements required from flow
                                 FlowRow(
                                     modifier = Modifier.fillMaxWidth(),
@@ -447,44 +403,6 @@ fun MainView(state: MainScreen.State, modifier: Modifier = Modifier) {
                                 ) {
                                     println("state.recents: (${state.recents.size}) ${state.recents}")
                                     for (media in state.recents) {
-                                        // doesn't apply to android
-                                        //if (!node.thumbState.hasLocalThumb()) continue
-
-                                        //if (getPlatform() == ApiInstallation.Platform.Android) { }
-                                        /*val thumb = getThumbPath(state.getAppDirs(), node.id)
-                                        println("thumb: $thumb (${node.path}, state: ${node.thumbState})")
-                                        // caches path, only provide path once it exists
-                                        AsyncImage(
-                                            modifier = Modifier.size(64.dp)
-                                                //.sizeIn(48.dp, 48.dp, 150.dp, 150.dp)
-                                                .border(4.dp, Color.LightGray, RoundedCornerShape(8.dp))
-                                                .clip(RoundedCornerShape(8.dp)),
-                                            model = thumb,
-                                            contentScale = ContentScale.Crop,
-                                            contentDescription = ""
-                                        )*/
-                                        // hangs on videos
-                                        /*val bmp = getThumbBitmap(state.getAppDirs(), media)
-                                        if (bmp == null) {
-                                            println("got no thumb: $media")
-                                            continue
-                                        }
-                                        Image(
-                                            modifier = Modifier.size(64.dp)
-                                                .border(4.dp, Color.LightGray, RoundedCornerShape(8.dp))
-                                                .clip(RoundedCornerShape(8.dp)),
-                                            //bitmap = bmp, TODO get this back
-                                            painter = bmp.asPainter(LocalPlatformContext.current),
-                                            contentScale = ContentScale.Crop,
-                                            contentDescription = ""
-                                        )*/
-
-                                        val imageRequest = rememberRetained {
-                                            ImageRequest.Builder(platformContext).data(
-                                                ThumbFetcherCoilModel(state.getAppDirs(), media)
-                                            ).build()
-                                        }
-
                                         AsyncImage(
                                             modifier = Modifier.size(64.dp)
                                                 .border(
@@ -493,8 +411,7 @@ fun MainView(state: MainScreen.State, modifier: Modifier = Modifier) {
                                                     RoundedCornerShape(8.dp)
                                                 )
                                                 .clip(RoundedCornerShape(8.dp)),
-                                            model = imageRequest,
-                                            imageLoader = imageLoader,
+                                            model = media,
                                             contentDescription = null,
                                             contentScale = ContentScale.Crop
                                         )

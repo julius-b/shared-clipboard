@@ -81,6 +81,7 @@ sqldelight-sqlite-driver = { module = "app.cash.sqldelight:sqlite-driver", versi
 sqldelight-coroutines-extensions = { module = "app.cash.sqldelight:coroutines-extensions", version.ref = "sqldelight" }
 appdirs = { module = "ca.gosyer:kotlin-multiplatform-appdirs", version.ref = "appdirs" }
 coil = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
+coil-network-ktor3 = { module = "io.coil-kt.coil3:coil-network-ktor3", version.ref = "coil" }
 thumbnailator = { module = "net.coobird:thumbnailator", version.ref = "thumbnailator" }
 kermit = { module = "co.touchlab:kermit", version.ref = "kermit" }
 work = { module = "androidx.work:work-runtime-ktx", version.ref = "work" }

@@ -38,7 +38,6 @@ import app.mindspaces.clipboard.SettingsScreen.Event.Back
 import app.mindspaces.clipboard.SettingsScreen.Event.ConfirmLogout
 import app.mindspaces.clipboard.SettingsScreen.Event.ToggleLogout
 import app.mindspaces.clipboard.db.Account
-import app.mindspaces.clipboard.db.cleanup
 import app.mindspaces.clipboard.parcel.CommonParcelize
 import app.mindspaces.clipboard.repo.AuthRepository
 import co.touchlab.kermit.Logger
@@ -63,7 +62,7 @@ import software.amazon.lastmile.kotlin.inject.anvil.AppScope
 data object SettingsScreen : Screen {
     data class State(
         val self: Account?,
-        // TODO enum {Logout, other modals} -> effectively only 1
+        // TODO enum {Logout, other modals} -> effectively only 1 (overlay: Overlay.Logout, .bla)
         val isLogout: Boolean,
         val eventSink: (Event) -> Unit
     ) : CircuitUiState

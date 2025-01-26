@@ -5,8 +5,11 @@ import androidx.work.Configuration
 import app.mindspaces.clipboard.di.AndroidApplicationComponent
 import app.mindspaces.clipboard.di.create
 import ca.gosyer.appdirs.impl.attachAppDirs
+import coil3.ImageLoader
+import coil3.PlatformContext
+import coil3.SingletonImageLoader
 
-class ClipboardApplication : Application(), Configuration.Provider {
+class ClipboardApplication : Application(), Configuration.Provider, SingletonImageLoader.Factory {
 
     val component: AndroidApplicationComponent by lazy {
         AndroidApplicationComponent.create(this)
@@ -24,4 +27,8 @@ class ClipboardApplication : Application(), Configuration.Provider {
         get() = Configuration.Builder()
             .setWorkerFactory(component.workerFactory)
             .build()
+
+    override fun newImageLoader(context: PlatformContext): ImageLoader {
+        return component.imageLoader
+    }
 }

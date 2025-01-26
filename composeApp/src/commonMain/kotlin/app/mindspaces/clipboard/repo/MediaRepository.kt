@@ -119,16 +119,18 @@ class MediaRepository(private val db: Database, private val client: HttpClient) 
         return mediaQueries.list().asFlow().mapToList(Dispatchers.IO)
     }
 
-    fun list(dir: String?): Flow<List<Media>> {
+    fun list(dir: String?, installationId: UUID?): Flow<List<Media>> {
         if (dir == null) {
             return directories()
         }
         println("returning files")
-        return files(dir)
+        return files(dir, installationId)
     }
 
-    fun files(dir: String): Flow<List<Media>> {
-        return mediaQueries.files(dir).asFlow().mapToList(Dispatchers.IO).distinctUntilChanged()
+    // installation_id is null for self
+    fun files(dir: String, installationId: UUID?): Flow<List<Media>> {
+        return mediaQueries.files(dir, installationId).asFlow().mapToList(Dispatchers.IO)
+            .distinctUntilChanged()
     }
 
     // TODO return MediaWithCount
@@ -162,6 +164,7 @@ class MediaRepository(private val db: Database, private val client: HttpClient) 
             val medias = success.data.map(ApiMedia::toEntity)
             db.transaction {
                 for (media in medias) {
+                    // TODO DO NOT SAVE media FROM SERVER WHERE installation_id = self!!
                     mediaQueries.insert(media)
                     mediaReceiptQueries.insert(MediaReceipt(media.id))
                 }
@@ -276,8 +279,6 @@ class MediaRepository(private val db: Database, private val client: HttpClient) 
 
     fun localFile(path: String, cre: Long?, mod: Long, size: Long) =
         mediaQueries.getLocal(path, cre, mod, size).executeAsOneOrNull()
-
-    fun save(media: Media) = mediaQueries.insert(media)
 
     fun saveRequest(req: MediaRequest) = mediaRequestQueries.insert(req)
 

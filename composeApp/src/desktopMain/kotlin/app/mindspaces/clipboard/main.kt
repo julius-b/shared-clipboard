@@ -11,6 +11,7 @@ import app.mindspaces.clipboard.data.generateThumbnails
 import app.mindspaces.clipboard.data.traverseFiles
 import app.mindspaces.clipboard.di.DesktopApplicationComponent
 import app.mindspaces.clipboard.di.create
+import coil3.SingletonImageLoader
 import com.slack.circuit.runtime.internal.rememberStableCoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -19,6 +20,7 @@ import java.io.File
 fun main() = application {
     //val app = remember { DesktopApplicationComponent::class.create() }
     val component = remember { DesktopApplicationComponent.create() }
+    SingletonImageLoader.setSafe { component.imageLoader }
 
     // force init InstallationRepo, it doesn't happen otherwise
     println("init: ${component.installationRepository}")
@@ -55,6 +57,7 @@ fun main() = application {
 
             scope.launch(Dispatchers.IO) {
                 // TODO also consider user.home, drive roots, etc.
+                // TODO allow user to pick more roots
                 traverseFiles(
                     File("/home/init/Pictures/nonpol/"),
                     component.mediaRepository,
