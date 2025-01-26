@@ -2,7 +2,10 @@ package app.mindspaces.clipboard.services
 
 import app.mindspaces.clipboard.api.ApiAccountProperty
 import app.mindspaces.clipboard.api.ApiAccountProperty.Type
+import app.mindspaces.clipboard.api.ApiError
+import app.mindspaces.clipboard.api.KeyInstallationID
 import app.mindspaces.clipboard.plugins.DatabaseSingleton.tx
+import app.mindspaces.clipboard.routes.ValidationException
 import io.ktor.util.logging.KtorSimpleLogger
 import kotlinx.datetime.Clock
 import org.jetbrains.exposed.dao.UUIDEntity
@@ -102,8 +105,12 @@ class AccountPropertiesService {
         val verificationCode = SecureRandom.getInstanceStrong().nextInt(100_000, 1_000_000)
         log.info("create - content: $c, verificationCode: $verificationCode")
 
+        val installation = InstallationEntity.findById(installationId) ?: throw ValidationException(
+            KeyInstallationID, ApiError.Reference(installationId.toString())
+        )
+
         AccountPropertyEntity.new {
-            this.installationId = EntityID(installationId, Installations)
+            this.installationId = installation.id
             this.type = type
             this.content = c
             this.verificationCode = verificationCode.toString()

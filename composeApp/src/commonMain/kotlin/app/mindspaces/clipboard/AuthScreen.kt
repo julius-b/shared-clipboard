@@ -18,11 +18,15 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,6 +65,7 @@ import software.amazon.lastmile.kotlin.inject.anvil.AppScope
 data object AuthScreen : Screen {
     data class State(
         val loading: Boolean,
+        val snackbarHostState: SnackbarHostState,
         val eventSink: (Event) -> Unit
     ) : CircuitUiState
 
@@ -85,20 +90,38 @@ class AuthPresenter(
 
         var loading by rememberRetained { mutableStateOf(false) }
 
-        return AuthScreen.State(loading) { event ->
+        val snackbarHostState = remember { SnackbarHostState() }
+
+        fun showSnackbar(text: String) {
+            scope.launch(Dispatchers.Main) {
+                snackbarHostState.currentSnackbarData?.dismiss()
+                snackbarHostState.showSnackbar(text, duration = SnackbarDuration.Short)
+            }
+        }
+
+        return AuthScreen.State(loading, snackbarHostState) { event ->
             when (event) {
                 is Authenticate -> {
                     loading = true
                     scope.launch(Dispatchers.IO) {
                         val account = authRepository.signup(event.name, event.secret, event.email)
-                        if (account !is RepoResult.Data) {
-                            log.e { "failed to create account: $account" }
-                            return@launch
-                        }
-                        log.i { "account created - name=${account.data.account.name}" }
+                        when (account) {
+                            is RepoResult.Data -> {
+                                log.i { "signup successful - name=${account.data.account.name}" }
+                                withContext(Dispatchers.Main) {
+                                    navigator.pop()
+                                }
+                            }
 
-                        withContext(Dispatchers.Main) {
-                            navigator.pop()
+                            is RepoResult.ValidationError -> {
+                                log.w { "validation errors: ${account.errors}" }
+                                account.errors.forEach { err ->
+                                    log.w { "${err.key}: ${err.value.contentDeepToString()}" }
+                                }
+                                showSnackbar("Please check your inputs")
+                            }
+
+                            else -> showSnackbar("No internet connection")
                         }
                     }.invokeOnCompletion {
                         loading = false
@@ -116,7 +139,8 @@ class AuthPresenter(
 @Composable
 fun AuthView(state: AuthScreen.State, modifier: Modifier = Modifier) {
     Scaffold(
-        modifier = Modifier.fillMaxWidth()
+        modifier = modifier.fillMaxWidth(),
+        snackbarHost = { SnackbarHost(hostState = state.snackbarHostState) }
     ) { innerPadding ->
         Column(
             modifier = modifier.fillMaxSize().padding(innerPadding)

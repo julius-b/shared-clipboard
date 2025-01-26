@@ -6,6 +6,7 @@ import app.mindspaces.clipboard.api.ApiErrorResponse
 import app.mindspaces.clipboard.api.ApiInstallation
 import app.mindspaces.clipboard.api.ApiInstallationLink
 import app.mindspaces.clipboard.api.ApiSuccessResponse
+import app.mindspaces.clipboard.api.InstallationLinkNameParams
 import app.mindspaces.clipboard.api.InstallationParams
 import app.mindspaces.clipboard.api.Installations
 import app.mindspaces.clipboard.api.KeyInstallationID
@@ -13,6 +14,7 @@ import app.mindspaces.clipboard.api.toEntity
 import app.mindspaces.clipboard.db.AllLinks
 import app.mindspaces.clipboard.db.Database
 import app.mindspaces.clipboard.db.Installation
+import app.mindspaces.clipboard.db.InstallationLink
 import app.mindspaces.clipboard.getPlatform
 import co.touchlab.kermit.Logger
 import io.ktor.client.HttpClient
@@ -93,6 +95,32 @@ class InstallationRepository(db: Database, private val client: HttpClient) {
     fun allLinks(): Flow<List<AllLinks>> {
         return installationQueries.allLinks().asFlow().mapToList(Dispatchers.IO)
             .distinctUntilChanged()
+    }
+
+    fun saveInstallation(installation: Installation) {
+        installationQueries.insert(installation)
+    }
+
+    suspend fun updateLinkName(linkId: UUID, name: String): RepoResult<InstallationLink> {
+        try {
+            val resp = client.put(Installations.Links.UpdateName(linkId)) {
+                contentType(ContentType.Application.Json)
+                setBody(InstallationLinkNameParams(name))
+            }
+            if (!resp.status.isSuccess()) {
+                log.e { "update-link-name(linkId=$linkId, name=$name) - failed: $resp" }
+                val err = resp.body<ApiErrorResponse>()
+                return RepoResult.ValidationError(err.errors)
+            }
+            val success = resp.body<ApiSuccessResponse<ApiInstallationLink>>()
+            val link = success.data.toEntity()
+
+            installationQueries.insertLink(link)
+            return RepoResult.Data(link)
+        } catch (e: Throwable) {
+            log.e(e) { "update-link-name(linkId=$linkId, name=$name) - unexpected resp: $e" }
+            return RepoResult.NetworkError
+        }
     }
 
     private suspend fun sync(): RepoResult<Installation> = mutex.withLock {

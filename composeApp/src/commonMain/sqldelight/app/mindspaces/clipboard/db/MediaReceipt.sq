@@ -10,3 +10,6 @@ INSERT OR REPLACE INTO mediaReceipt (media_id) VALUES ?;
 
 delete:
 DELETE FROM mediaReceipt WHERE media_id = ?;
+
+truncate:
+DELETE FROM mediaReceipt;

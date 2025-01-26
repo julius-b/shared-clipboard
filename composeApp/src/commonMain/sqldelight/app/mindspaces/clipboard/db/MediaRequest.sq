@@ -20,3 +20,6 @@ INSERT OR REPLACE INTO mediaRequest (id, self, media_id, created_at) VALUES ?;
 
 delete:
 DELETE FROM mediaRequest WHERE id = ?;
+
+truncate:
+DELETE FROM mediaRequest;

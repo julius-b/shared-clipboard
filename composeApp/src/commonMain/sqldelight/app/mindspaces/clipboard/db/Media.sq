@@ -104,3 +104,6 @@ UPDATE media SET thumbRetryCount = 0 WHERE installation_id IS NULL AND path = ? 
 --insertFromRemote:
 insert:
 INSERT OR REPLACE INTO media (id, path, dir, cre, mod, size, thumbState, synced, mediaType, installation_id, created_at) VALUES ?;
+
+truncate:
+DELETE FROM media;

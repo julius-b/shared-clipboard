@@ -23,6 +23,8 @@ object Installations : UUIDTable() {
     val createdAt = timestamp("created_at").clientDefault {
         Clock.System.now()
     }
+
+    // NOTE: not supported by clients, only delete link
     val deletedAt = timestamp("deleted_at").nullable()
 }
 
@@ -121,6 +123,12 @@ class InstallationsService {
 
     suspend fun getLink(id: UUID): ApiInstallationLink? = tx {
         InstallationLinkEntity.findById(id)?.toDTO()
+    }
+
+    suspend fun updateLink(id: UUID, name: String): ApiInstallationLink? = tx {
+        InstallationLinkEntity.findByIdAndUpdate(id) {
+            it.name = name
+        }?.toDTO()
     }
 
     suspend fun deleteLinks(accountId: UUID, installationId: UUID) = tx {

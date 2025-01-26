@@ -17,6 +17,7 @@ fun SimpleInputField(
     label: String,
     value: String,
     valid: Boolean,
+    enabled: Boolean = true,
     onValueChange: (String) -> Unit,
     errorText: String = "required",
     modifier: Modifier = Modifier.fillMaxWidth()
@@ -35,6 +36,7 @@ fun SimpleInputField(
             if (focusState.isFocused) wasFocused = true
             if (!focusState.isFocused && wasFocused) touched = true
         },
+        enabled = enabled,
         label = { Text(label) },
         supportingText = {
             if (touched && !valid) {

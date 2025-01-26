@@ -3,6 +3,7 @@ package app.mindspaces.clipboard.di
 import app.mindspaces.clipboard.api.newHttpClient
 import app.mindspaces.clipboard.db.Database
 import app.mindspaces.clipboard.db.DriverFactory
+import app.mindspaces.clipboard.db.cleanup
 import app.mindspaces.clipboard.db.createDatabase
 import app.mindspaces.clipboard.repo.AuthRepository
 import app.mindspaces.clipboard.repo.InstallationRepository
@@ -40,11 +41,7 @@ interface SharedApplicationComponent {
     fun provideHttpClient(): HttpClient = newHttpClient(db) {
         val log = Logger.withTag("shared")
         log.i { "initiating logout..." }
-        // TODO make navigator DI, call logout
-        // TODO cleanup while other screen is open might crash that screen, navigate before cleanup might auto-redirect to MainScreen
-        // alt: sharedFlow, everyone can listen and perform logout actions
-        // navigator.resetRoot(AuthScreen)
-        // cleanup(db)
+        cleanup(db)
     }
 
     @Provides

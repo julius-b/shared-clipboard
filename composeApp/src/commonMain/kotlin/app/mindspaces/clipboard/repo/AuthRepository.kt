@@ -12,12 +12,14 @@ import app.mindspaces.clipboard.api.AuthHints
 import app.mindspaces.clipboard.api.AuthSessionParams
 import app.mindspaces.clipboard.api.AuthSessions
 import app.mindspaces.clipboard.api.HintedApiSuccessResponse
+import app.mindspaces.clipboard.api.KeyInstallationID
 import app.mindspaces.clipboard.api.SignupParams
 import app.mindspaces.clipboard.api.toEntity
 import app.mindspaces.clipboard.db.Account
 import app.mindspaces.clipboard.db.AccountProperty
 import app.mindspaces.clipboard.db.AuthSession
 import app.mindspaces.clipboard.db.Database
+import app.mindspaces.clipboard.db.cleanup
 import co.touchlab.kermit.Logger
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -30,6 +32,7 @@ import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import me.tatarka.inject.annotations.Inject
 import software.amazon.lastmile.kotlin.inject.anvil.AppScope
 import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
@@ -46,8 +49,14 @@ class AuthRepository(private val db: Database, private val client: HttpClient) {
     fun self() =
         accountQueries.getSelf().asFlow().mapToOneOrNull(Dispatchers.IO).distinctUntilChanged()
 
+    fun selfResult() = accountQueries.getSelf().asFlow().mapToOneOrNull(Dispatchers.IO).map {
+        if (it == null) RepoResult.Empty(loading = false)
+        else RepoResult.Data(it)
+    }.distinctUntilChanged()
+
     // NOTE: do not clean installation, but links
-    suspend fun login(unique: String, secret: String): RepoResult<AuthSessionResult> {
+    suspend fun login(unique: String, secret: String, cleanup: Boolean = true):
+            RepoResult<AuthSessionResult> {
         log.i { "login - unique: $unique" }
         try {
             val resp = client.post(AuthSessions()) {
@@ -56,12 +65,18 @@ class AuthRepository(private val db: Database, private val client: HttpClient) {
             }
             if (!resp.status.isSuccess()) {
                 val err = resp.body<ApiErrorResponse>()
+                if (cleanup && err.errors.containsKey(KeyInstallationID)) {
+                    log.w { "cleanup - found stale installation, full cleanup..." }
+                    cleanup(db, full = true)
+                    return login(unique, secret, false)
+                }
                 return RepoResult.ValidationError(err.errors)
             }
             val success = resp.body<HintedApiSuccessResponse<ApiAuthSession, AuthHints>>()
             val session = success.data.toEntity()
             val props = success.hints.properties.map(ApiAccountProperty::toEntity)
             val account = success.hints.account.toEntity()
+            log.i { "login - saving resp: $success..." }
             db.transaction {
                 accountQueries.insert(account)
                 authSessionQueries.insert(session)
@@ -79,7 +94,8 @@ class AuthRepository(private val db: Database, private val client: HttpClient) {
         }
     }
 
-    suspend fun signup(name: String, secret: String, email: String): RepoResult<AccountResult> {
+    suspend fun signup(name: String, secret: String, email: String, cleanup: Boolean = true):
+            RepoResult<AccountResult> {
         log.i { "signup - name: $name" }
         try {
             val resp = client.post(Accounts.Signup()) {
@@ -88,13 +104,18 @@ class AuthRepository(private val db: Database, private val client: HttpClient) {
             }
             if (!resp.status.isSuccess()) {
                 val err = resp.body<ApiErrorResponse>()
+                if (cleanup && err.errors.containsKey(KeyInstallationID)) {
+                    log.w { "signup - found stale installation, full cleanup..." }
+                    cleanup(db, full = true)
+                    return signup(name, secret, email, false)
+                }
                 return RepoResult.ValidationError(err.errors)
             }
             val success = resp.body<HintedApiSuccessResponse<ApiAccount, AccountHints>>()
             val validatedProperties = success.hints.properties.map(ApiAccountProperty::toEntity)
             val session = success.hints.session.toEntity()
             val account = success.data.toEntity()
-            log.i { "signup - got session: $session" }
+            log.i { "signup - saving resp: $success..." }
             db.transaction {
                 // should never cause conflicts since db is cleared before insert
                 // TODO clean db before insert
@@ -112,6 +133,11 @@ class AuthRepository(private val db: Database, private val client: HttpClient) {
             log.e(e) { "signup - unexpected resp: $e" }
             return RepoResult.Empty(false)
         }
+    }
+
+    // wrapper
+    fun logout() {
+        cleanup(db)
     }
 
     data class AccountResult(

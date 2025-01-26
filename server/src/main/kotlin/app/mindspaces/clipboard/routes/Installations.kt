@@ -1,13 +1,16 @@
 package app.mindspaces.clipboard.routes
 
 import app.mindspaces.clipboard.api.ApiSuccessResponse
+import app.mindspaces.clipboard.api.InstallationLinkNameParams
 import app.mindspaces.clipboard.api.InstallationParams
 import app.mindspaces.clipboard.services.installationsService
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.auth.authenticate
+import io.ktor.server.auth.jwt.JWTPrincipal
+import io.ktor.server.auth.principal
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
-import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
 import io.ktor.server.routing.put
 import io.ktor.server.routing.route
@@ -37,12 +40,23 @@ fun Route.installationsApi() {
                 call.respond(HttpStatusCode.NotFound)
             }
         }
-        delete("{id}") {
-            val id = UUID.fromString(call.parameters["id"])
-            if (installationsService.delete(id)) {
-                call.respond(HttpStatusCode.OK)
-            } else {
-                call.respond(HttpStatusCode.UnprocessableEntity)
+        authenticate("auth-jwt") {
+            route("links") {
+                put("{id}/name") {
+                    val principal = call.principal<JWTPrincipal>()!!
+                    val selfId =
+                        UUID.fromString(principal.payload.getClaim("account_id").asString())
+                    val id = UUID.fromString(call.parameters["id"])
+                    val req = call.receive<InstallationLinkNameParams>()
+
+                    // TODO ensure link.account_id = selfId
+                    val link = installationsService.updateLink(id, req.name)
+                    if (link != null) {
+                        call.respond(HttpStatusCode.OK, ApiSuccessResponse(data = link))
+                    } else {
+                        call.respond(HttpStatusCode.UnprocessableEntity)
+                    }
+                }
             }
         }
     }

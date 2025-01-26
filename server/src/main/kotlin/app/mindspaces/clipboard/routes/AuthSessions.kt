@@ -54,17 +54,20 @@ fun Route.authSessionsApi() {
             }
 
             val link = if (req.linkId != null) {
-                val link = installationsService.getLink(req.linkId!!)
-                    ?: throw ValidationException(
-                        "link_id", ApiError.Reference(req.linkId.toString())
-                    )
+                val link = installationsService.getLink(req.linkId!!) ?: throw ValidationException(
+                    "link_id", ApiError.Reference(req.linkId.toString())
+                )
+                if (link.installationId != installationId) throw ValidationException(
+                    "link_id", ApiError.Forbidden(req.linkId.toString(), "installation_id")
+                )
                 if (link.accountId != account.id) throw ValidationException(
                     "link_id", ApiError.Forbidden(req.linkId.toString(), "account_id")
                 )
                 link
                 // TODO delete keys (?)
             } else {
-                // TODO could reuse link
+                // If client is not aware of previous link,
+                // it's most likely not aware of that links client-side generated resources either
                 log.info("post - linking account ${account.id} with installation $installationId")
                 installationsService.deleteLinks(account.id, installationId)
                 installationsService.linkInstallation(account.id, installationId)

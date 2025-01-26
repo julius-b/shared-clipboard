@@ -106,7 +106,7 @@ class SignInPresenter(
                         val session = authRepository.login(event.unique, event.secret)
                         when (session) {
                             is RepoResult.Data -> {
-                                log.i { "session created - name=${session.data.account.name}" }
+                                log.i { "login successful - name=${session.data.account.name}" }
                                 withContext(Dispatchers.Main) {
                                     navigator.pop()
                                     navigator.pop()
@@ -115,7 +115,7 @@ class SignInPresenter(
 
                             is RepoResult.ValidationError -> {
                                 log.w { "validation errors: ${session.errors}" }
-                                session.errors?.forEach { err ->
+                                session.errors.forEach { err ->
                                     log.w { "${err.key}: ${err.value.contentDeepToString()}" }
                                     when (err.key) {
                                         "unique" -> {
@@ -137,10 +137,7 @@ class SignInPresenter(
                                 showSnackbar("Please check your inputs")
                             }
 
-                            else -> {
-                                log.w { "network error: $session" }
-                                showSnackbar("Network error")
-                            }
+                            else -> showSnackbar("No internet connection")
                         }
                     }.invokeOnCompletion {
                         loading = false
@@ -160,7 +157,7 @@ class SignInPresenter(
 fun SignInView(state: SignInScreen.State, modifier: Modifier = Modifier) {
     // TODO share snachbarHostState across app?
     Scaffold(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         snackbarHost = { SnackbarHost(hostState = state.snackbarHostState) }
     ) { innerPadding ->
         Column(

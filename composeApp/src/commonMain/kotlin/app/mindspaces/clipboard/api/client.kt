@@ -96,7 +96,13 @@ fun newHttpClient(
                 }
                 refreshTokens {
                     log.i { "refreshing..." }
-                    val refreshToken = this.oldTokens?.refreshToken ?: return@refreshTokens null
+                    val refreshToken = this.oldTokens?.refreshToken
+                    if (refreshToken == null) {
+                        // could occur when logout fails
+                        log.e { "no previous tokens, forcing logout..." }
+                        onUnauthorized()
+                        return@refreshTokens null
+                    }
                     log.d { "refresh token: $refreshToken" }
                     // TODO what happens if no network during this request?
                     val resp = client.post(AuthSessions.Refresh()) {

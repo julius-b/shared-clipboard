@@ -524,6 +524,9 @@ fun MainView(state: MainScreen.State, modifier: Modifier = Modifier) {
 @Composable
 fun InfoCard(content: @Composable ColumnScope.() -> Unit) {
     Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+        ),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {

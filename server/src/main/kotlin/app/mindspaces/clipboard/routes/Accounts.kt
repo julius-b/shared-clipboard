@@ -45,7 +45,7 @@ fun Route.accountsApi() {
             val installationId = UUID.fromString(call.request.headerOrFail(KeyInstallationID))
             val req = call.receive<SignupParams>().sanitize()
 
-            // invalid
+            // save unvalidated property
             val property = accountPropertiesService.create(
                 installationId, ApiAccountProperty.Type.Email, req.email
             )
@@ -171,7 +171,6 @@ fun Route.accountsApi() {
                     call.respond(HttpStatusCode.UnprocessableEntity)
                 }
             }
-
             get("by-handle/{handle}") {
                 val handle = call.parameters["handle"] ?: throw ValidationException(
                     "handle", ApiError.Required()
@@ -181,7 +180,6 @@ fun Route.accountsApi() {
                 )
                 call.respond(HttpStatusCode.OK, ApiSuccessResponse(data = account))
             }
-
             route("links") {
                 post {
                     val principal = call.principal<JWTPrincipal>()!!
@@ -207,7 +205,6 @@ fun Route.accountsApi() {
                     call.respond(ApiSuccessResponse(count = links.size, data = links))
                 }
             }
-
             get("{id}/installations") {
                 val accountId = UUID.fromString(call.parameters["id"])
 

@@ -62,3 +62,8 @@ data class ApiInstallationLink(
     @SerialName("created_at") val createdAt: Instant,
     @SerialName("deleted_at") val deletedAt: Instant?
 )
+
+@Serializable
+data class InstallationLinkNameParams(
+    val name: String
+)
