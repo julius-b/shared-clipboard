@@ -25,7 +25,7 @@ data class ApiMediaReceipt(
     @SerialName("media_id") val mediaId: SUUID,
     @SerialName("installation_id") val installationId: SUUID,
     @SerialName("has_thumb") val hasThumb: Boolean,
-    @SerialName("has_fil") val hasFile: Boolean
+    @SerialName("has_file") val hasFile: Boolean
 )
 
 @Serializable

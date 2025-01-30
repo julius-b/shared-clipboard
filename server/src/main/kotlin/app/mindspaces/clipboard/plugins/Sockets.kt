@@ -28,6 +28,7 @@ import io.ktor.server.websocket.webSocket
 import io.ktor.util.logging.KtorSimpleLogger
 import io.ktor.websocket.CloseReason
 import io.ktor.websocket.close
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -102,31 +103,32 @@ fun Application.configureSockets() {
                     v.cnt++
                     v
                 }!!
-                msg(Notice("config - accountChat=$accountChan"))
-
-                val links = installationsService.listLinks(accountId)
-                log.info("[$accountId/$handle]: links: #${links.size}")
-                msg(Devices(links))
-
-                // dev
-                val reqMedia = mediasService.randomByInstallation(installationId)
-
-                log.info("[$accountId/$handle]: requesting random media: $reqMedia")
-                reqMedia?.let {
-                    val req = ApiMediaRequest(
-                        UUID.randomUUID(), reqMedia.id, installationId, Clock.System.now()
-                    )
-                    msg(MediaRequest(req))
-                }
-
-                val job = launch {
-                    // TODO publish received media requests to account chan, on connect send currently existing (might be from before server start, etc.)
-                    accountChan.recv.collect { message ->
-                        sendSerialized(message)
-                    }
-                }
-
+                var job: Job? = null
                 runCatching {
+                    msg(Notice("config - accountChat=$accountChan"))
+
+                    val links = installationsService.listLinks(accountId)
+                    log.info("[$accountId/$handle]: links: #${links.size}")
+                    msg(Devices(links))
+
+                    // dev
+                    val reqMedia = mediasService.randomByInstallation(installationId)
+
+                    log.info("[$accountId/$handle]: requesting random media: $reqMedia")
+                    reqMedia?.let {
+                        val req = ApiMediaRequest(
+                            UUID.randomUUID(), reqMedia.id, installationId, Clock.System.now()
+                        )
+                        msg(MediaRequest(req))
+                    }
+
+                    job = launch {
+                        // TODO publish received media requests to account chan, on connect send currently existing (might be from before server start, etc.)
+                        accountChan.recv.collect { message ->
+                            sendSerialized(message)
+                        }
+                    }
+
                     while (isActive) {
                         val msg = receiveDeserialized<Message>()
                         accountChan.send.emit(msg)
@@ -135,7 +137,7 @@ fun Application.configureSockets() {
                     log.info("[$accountId/$handle]: socket err: ${exception.localizedMessage}")
                 }.also {
                     log.info("[$accountId/$handle]: cancelling")
-                    job.cancel()
+                    job?.cancel()
                     log.info("[$accountId/$handle]: cancelled")
                     close(CloseReason(CloseReason.Codes.INTERNAL_ERROR, "Receive failed"))
                     clients.computeIfPresent(accountId) { _, v ->

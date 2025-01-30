@@ -56,8 +56,8 @@ interface SharedApplicationComponent {
     @SingleIn(AppScope::class)
     fun getDriverFactory(): DriverFactory
 
-    @SingleIn(AppScope::class)
     @Provides
+    @SingleIn(AppScope::class)
     fun circuit(presenterFactories: Set<Presenter.Factory>, uiFactories: Set<Ui.Factory>): Circuit {
         return Circuit.Builder()
             .addPresenterFactories(presenterFactories)

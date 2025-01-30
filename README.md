@@ -137,11 +137,26 @@ export refresh_token=$(jq -r '.data.refresh_token' <<< "$output")
 echo "refresh_token: $refresh_token"
 ```
 
+### Refresh
+```shell
+output=$(curl -s -X POST -H "Installation-Id: $installation_id" -H "Refresh-Token: Bearer $refresh_token" -H "Content-Type: application/json" "$host/api/v1/auth_sessions/refresh")
+echo "$output"
+export sess_id=$(jq -r '.data.id' <<< "$output")
+echo "sess_id: $sess_id"
+export access_token=$(jq -r '.data.access_token' <<< "$output")
+echo "access_token: $access_token"
+export refresh_token=$(jq -r '.data.refresh_token' <<< "$output")
+echo "refresh_token: $refresh_token"
+```
+
 ## Medias Api
 ### List own (Authentication required)
-- **server returns medias for which this installation-id has submitted no receipt, or where the receipt mismatches the server's `has_file` or `has_thumb`**
+- **server returns medias for which this installation-link-id has submitted no receipt, or where the receipt mismatches the server-side media's `has_file` or `has_thumb`**
 ```shell
-curl -H "Authorization: Bearer $access_token" "$host/api/v1/medias"
+output=$(curl -s -H "Authorization: Bearer $access_token" "$host/api/v1/medias")
+echo "$output"
+export media_id=$(jq -r '.data[0].id' <<< "$output")
+echo "media_id (latest unreceived): $media_id"
 ```
 
 ### List all (Root Authentication required)
@@ -201,7 +216,7 @@ curl -d '{"has_thumb":"true"}' -H "Authorization: Bearer $access_token" -H "Cont
 #### Create File and Thumbnail receipt
 - `has_file`-only is also possible and valid
 ```shell
-curl -d '{"has_thumb":"true"}' -H "Authorization: Bearer $access_token" -H "Content-Type: application/json" "$host/api/v1/medias/$media_id/receipts"
+curl -d '{"has_file":"true"}' -H "Authorization: Bearer $access_token" -H "Content-Type: application/json" "$host/api/v1/medias/$media_id/receipts"
 ```
 
 ## TODO

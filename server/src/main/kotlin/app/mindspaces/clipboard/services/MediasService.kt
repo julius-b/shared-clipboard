@@ -74,7 +74,7 @@ fun MediaEntity.toDTO() =
 
 object MediaReceipts : CompositeIdTable() {
     val mediaId = reference("media_id", Medias)
-    val installationId = reference("installation_id", Installations)
+    val installationLinkId = reference("installation_link_id", InstallationLinks)
     val hasThumb = bool("has_thumb")
     val hasFile = bool("has_file")
     val createdAt = timestamp("created_at").clientDefault {
@@ -84,17 +84,17 @@ object MediaReceipts : CompositeIdTable() {
 
     init {
         addIdColumn(mediaId)
-        addIdColumn(installationId)
+        addIdColumn(installationLinkId)
     }
 
-    override val primaryKey = PrimaryKey(mediaId, installationId)
+    override val primaryKey = PrimaryKey(mediaId, installationLinkId)
 }
 
 class MediaReceiptEntity(id: EntityID<CompositeID>) : CompositeEntity(id) {
     companion object : CompositeEntityClass<MediaReceiptEntity>(MediaReceipts)
 
     var mediaId by MediaReceipts.mediaId
-    var installationId by MediaReceipts.installationId
+    var installationLinkId by MediaReceipts.installationLinkId
     var hasThumb by MediaReceipts.hasThumb
     var hasFile by MediaReceipts.hasFile
     var createdAt by MediaReceipts.createdAt
@@ -102,49 +102,60 @@ class MediaReceiptEntity(id: EntityID<CompositeID>) : CompositeEntity(id) {
 }
 
 fun MediaReceiptEntity.toDTO() =
-    ApiMediaReceipt(mediaId.value, installationId.value, hasThumb, hasFile)
+    ApiMediaReceipt(mediaId.value, installationLinkId.value, hasThumb, hasFile)
 
 // it's a word: https://en.wiktionary.org/wiki/medias#English
 class MediasService {
     val log = KtorSimpleLogger("medias-svc")
 
-    suspend fun all(accountId: UUID? = null, installationId: UUID? = null): List<ApiMedia> = tx {
-        MediaEntity.wrapRows(
-            // TODO custom all for root, don't only return media files with active installation-link
-            Medias
-                // 1-to-1
-                //.innerJoin(Installations)
-                // can't ensure 1-to-1 linking (also if using this: already apply accountId here)
-                //.innerJoin(InstallationLinks)
-                // 1-to-1 even with multiple links, left-join for root case
-                .leftJoin(
-                    Accounts,
-                    additionalConstraint = {
-                        Accounts.id inSubQuery (
-                                InstallationLinks.select(InstallationLinks.accountId)
-                                    .where { InstallationLinks.installationId eq installationId })
-                    })
-                .leftJoin(
-                    MediaReceipts,
-                    onColumn = { Medias.id },
-                    otherColumn = { mediaId },
-                    additionalConstraint = { (Medias.installationId eq MediaReceipts.installationId) and (MediaReceipts.installationId eq installationId) }
-                )
-                .selectAll()
-                // either both true or both false, media-receipts left-join is ignored if no accountId is submitted,
-                // therefore so is installationId
-                .apply {
-                    if (accountId != null) where {
-                        // NOTE Exposed does `eq` syntax needs all these parenthesis
-                        //(InstallationLinks.accountId eq accountId) and
-                        (Accounts.id eq accountId) and
-                                (MediaReceipts.mediaId eq null or
-                                        (MediaReceipts.hasThumb neq Medias.hasThumb) or
-                                        (MediaReceipts.hasFile neq Medias.hasFile))
+    // don't return media uploaded by this device (TODO while prev link might be deleted, iid remains...)
+    // - alt: for every upload create media-receipt of link_id -> needless dup
+    suspend fun all(accountId: UUID? = null, installationLinkId: UUID? = null): List<ApiMedia> =
+        tx {
+            val installationLink = installationLinkId?.let { InstallationLinkEntity.findById(it) }
+
+            MediaEntity.wrapRows(
+                // TODO custom all for root, don't only return media files with active installation-link
+                Medias
+                    // 1-to-1
+                    //.innerJoin(Installations)
+                    // can't ensure 1-to-1 linking (also if using this: already apply accountId here)
+                    //.innerJoin(InstallationLinks)
+                    // 1-to-1 even with multiple links, left-join for root case
+                    // media is accessible, through installation-links, to all these accounts
+                    .leftJoin(
+                        Accounts,
+                        additionalConstraint = {
+                            Accounts.id inSubQuery (
+                                    InstallationLinks.select(InstallationLinks.accountId)
+                                        .where {
+                                            (InstallationLinks.installationId eq Medias.installationId) and (InstallationLinks.deletedAt eq null)
+                                        }
+                                    )
+                        }
+                    )
+                    .leftJoin(
+                        MediaReceipts,
+                        onColumn = { Medias.id },
+                        otherColumn = { mediaId },
+                        additionalConstraint = { MediaReceipts.installationLinkId eq installationLinkId }
+                    )
+                    .selectAll()
+                    // either both true or both false, media-receipts left-join is ignored if no accountId is submitted,
+                    // therefore so is installationId
+                    .apply {
+                        if (accountId != null) where {
+                            // NOTE Exposed does `eq` syntax needs all these parenthesis
+                            //(InstallationLinks.accountId eq accountId) and
+                            (Accounts.id eq accountId) and
+                                    (MediaReceipts.mediaId eq null or
+                                            (MediaReceipts.hasThumb neq Medias.hasThumb) or
+                                            (MediaReceipts.hasFile neq Medias.hasFile)) and
+                                    (Medias.installationId neq installationLink?.installationId?.value)
+                        }
                     }
-                }
-        ).map(MediaEntity::toDTO)
-    }
+            ).map(MediaEntity::toDTO)
+        }
 
     suspend fun get(id: UUID): ApiMedia? = tx {
         MediaEntity.findById(id)?.toDTO()
@@ -214,27 +225,27 @@ class MediasService {
 
     suspend fun saveReceipt(
         mediaId: UUID,
-        installationId: UUID,
+        installationLinkId: UUID,
         hasThumb: Boolean? = null,
         hasFile: Boolean? = null
-    ) =
+    ): ApiMediaReceipt =
         tx {
             val receiptId = CompositeID {
                 it[MediaReceipts.mediaId] = mediaId
-                it[MediaReceipts.installationId] = installationId
+                it[MediaReceipts.installationLinkId] = installationLinkId
             }
 
             val updated = MediaReceiptEntity.findByIdAndUpdate(receiptId) { receipt ->
                 if (hasThumb != null) receipt.hasThumb = hasThumb
                 if (hasFile != null) receipt.hasFile = hasFile
-            }
+            }?.toDTO()
 
-            if (updated != null) return@tx
+            if (updated != null) return@tx updated
 
-            MediaReceiptEntity.new(receiptId) {
+            return@tx MediaReceiptEntity.new(receiptId) {
                 this.hasThumb = hasThumb ?: false
                 this.hasFile = hasFile ?: false
-            }
+            }.toDTO()
         }
 }
 

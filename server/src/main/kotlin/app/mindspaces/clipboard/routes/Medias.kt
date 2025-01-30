@@ -248,30 +248,27 @@ fun Route.mediasApi() {
             get {
                 val principal = call.principal<JWTPrincipal>()!!
                 val selfId = UUID.fromString(principal.payload.getClaim("account_id").asString())
-                val selfInstallationId =
-                    UUID.fromString(principal.payload.getClaim("installation_id").asString())
+                val selfInstallationLinkId =
+                    UUID.fromString(principal.payload.getClaim("link_id").asString())
                 // TODO && account.auth != Default
                 val all = call.queryParameters["all"] != null
 
                 val accountId = if (all) null else selfId
-                val installationId = if (all) null else selfInstallationId
-                val medias = mediasService.all(accountId, installationId)
+                val installationLinkId = if (all) null else selfInstallationLinkId
+                val medias = mediasService.all(accountId, installationLinkId)
                 call.respond(ApiSuccessResponse(count = medias.size, data = medias))
             }
             post("{mediaId}/receipts") {
                 val mediaId = UUID.fromString(call.parameters["mediaId"])
                 val principal = call.principal<JWTPrincipal>()!!
-                val selfInstallationId =
-                    UUID.fromString(principal.payload.getClaim("installation_id").asString())
+                val selfLinkId =
+                    UUID.fromString(principal.payload.getClaim("link_id").asString())
                 val req = call.receive<MediaReceiptParams>()
 
-                mediasService.saveReceipt(
-                    mediaId,
-                    selfInstallationId,
-                    hasThumb = req.hasThumb,
-                    hasFile = req.hasFile
+                val receipt = mediasService.saveReceipt(
+                    mediaId, selfLinkId, hasThumb = req.hasThumb, hasFile = req.hasFile
                 )
-                call.respond(ApiSuccessResponse(data = ""))
+                call.respond(ApiSuccessResponse(data = receipt))
             }
         }
         get("active") {
