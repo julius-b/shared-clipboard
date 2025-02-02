@@ -256,7 +256,7 @@ fun Route.mediasApi() {
                 val accountId = if (all) null else selfId
                 val installationLinkId = if (all) null else selfInstallationLinkId
                 val medias = mediasService.all(accountId, installationLinkId)
-                call.respond(ApiSuccessResponse(count = medias.size, data = medias))
+                call.respond(ApiSuccessResponse(medias.size, medias))
             }
             post("{mediaId}/receipts") {
                 val mediaId = UUID.fromString(call.parameters["mediaId"])
@@ -279,7 +279,7 @@ fun Route.mediasApi() {
         route("media_receipts") {
             get {
                 val receipts = mediasService.allReceipts()
-                call.respond(ApiSuccessResponse(count = receipts.size, data = receipts))
+                call.respond(ApiSuccessResponse(receipts.size, receipts))
             }
         }
     }

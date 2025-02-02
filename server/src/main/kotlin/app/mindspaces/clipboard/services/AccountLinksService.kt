@@ -38,9 +38,6 @@ class AccountLinkEntity(id: EntityID<UUID>) : UUIDEntity(id) {
     var deletedAt by AccountLinks.deletedAt
 }
 
-fun AccountLinkEntity.toDTO() =
-    ApiAccountLink(accountId.value, peerId.value, perm, createdAt, createdBy.value, deletedAt)
-
 class AccountLinksService {
     suspend fun all(): List<ApiAccountLink> = tx {
         AccountLinkEntity.all().map(AccountLinkEntity::toDTO)
@@ -62,5 +59,8 @@ class AccountLinksService {
         }.toDTO()
     }
 }
+
+fun AccountLinkEntity.toDTO() =
+    ApiAccountLink(accountId.value, peerId.value, perm, createdAt, createdBy.value, deletedAt)
 
 val accountLinksService = AccountLinksService()

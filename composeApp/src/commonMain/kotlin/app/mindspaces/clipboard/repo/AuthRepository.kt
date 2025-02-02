@@ -1,6 +1,7 @@
 package app.mindspaces.clipboard.repo
 
 import app.cash.sqldelight.coroutines.asFlow
+import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
 import app.mindspaces.clipboard.api.AccountHints
 import app.mindspaces.clipboard.api.Accounts
@@ -53,6 +54,9 @@ class AuthRepository(private val db: Database, private val client: HttpClient) {
         if (it == null) RepoResult.Empty(loading = false)
         else RepoResult.Data(it)
     }.distinctUntilChanged()
+
+    fun properties() =
+        accountPropertyQueries.getSelf().asFlow().mapToList(Dispatchers.IO).distinctUntilChanged()
 
     // NOTE: do not clean installation, but links
     suspend fun login(unique: String, secret: String, cleanup: Boolean = true):

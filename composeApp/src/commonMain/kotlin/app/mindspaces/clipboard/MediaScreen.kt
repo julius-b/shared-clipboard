@@ -13,21 +13,16 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -41,12 +36,13 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import app.mindspaces.clipboard.MediaScreen.Event.Back
 import app.mindspaces.clipboard.MediaScreen.Event.MediaClicked
 import app.mindspaces.clipboard.MediaScreen.Event.ToggleDevice
+import app.mindspaces.clipboard.components.SimpleScaffold
+import app.mindspaces.clipboard.data.fileName
+import app.mindspaces.clipboard.data.toThumbModel
 import app.mindspaces.clipboard.db.AllLinks
 import app.mindspaces.clipboard.db.Media
 import app.mindspaces.clipboard.parcel.CommonParcelable
@@ -68,9 +64,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import me.tatarka.inject.annotations.Assisted
 import me.tatarka.inject.annotations.Inject
-import org.jetbrains.compose.resources.Font
-import sharedclipboard.composeapp.generated.resources.Anton_Regular
-import sharedclipboard.composeapp.generated.resources.Res
 import software.amazon.lastmile.kotlin.inject.anvil.AppScope
 import java.util.UUID
 
@@ -123,7 +116,7 @@ class MediaPresenter(
     private val installationRepository: InstallationRepository,
     private val mediaRepository: MediaRepository
 ) : Presenter<MediaScreen.State> {
-    val log = Logger.withTag("MediaScreen")
+    private val log = Logger.withTag("MediaScreen")
 
     init {
         log.i { "init - dir: ${screen.dir}" }
@@ -137,17 +130,15 @@ class MediaPresenter(
         val devices by installationRepository.allLinks().collectAsRetainedState(listOf())
         val deselected = rememberRetained { mutableStateMapOf<UUID, Boolean>() }
 
-        // TODO via remember(installation)
         // TODO move deselected into sql? remember(deselected)
         val medias by mediaRepository.list(screen.dir?.path, screen.dir?.installationId)
             .map { medias ->
                 log.i { "medias: $medias" }
                 withContext(IO) {
                     medias.map {
-                        // TODO cross platform
                         val name =
-                            if (screen.dir == null) it.dir.substringAfterLast('/')
-                            else it.path.substringAfterLast('/')
+                            if (screen.dir == null) it.dir.fileName()
+                            else it.path.fileName()
 
                         DisplayMedia(it, name)
                     }
@@ -183,6 +174,7 @@ class MediaPresenter(
                         navigator.goTo(MediaScreen(event.media.toDirectory()))
                         return@State
                     }
+                    navigator.goTo(MediaDetailScreen(event.media.media.id))
                 }
 
                 is ToggleDevice -> {
@@ -196,103 +188,78 @@ class MediaPresenter(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @CircuitInject(MediaScreen::class, AppScope::class)
 @Composable
 fun MediaView(state: MediaScreen.State, modifier: Modifier = Modifier) {
-    Scaffold(
-        modifier = modifier,
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        state.title.uppercase(),
-                        fontSize = 24.sp,
-                        fontFamily = FontFamily(Font(Res.font.Anton_Regular))
+    SimpleScaffold(modifier, state.title, onBack = { state.eventSink(Back) }) {
+        if (state.dir == null) {
+            LazyRow {
+                // link_is guaranteed to be unique, TODO ensure installation_id is also
+                items(state.devices, key = { it.installation_id }) { device ->
+                    val name =
+                        device.deviceName() + if (device.self) " (this device)" else " (${device.os})"
+                    val selected = device.installation_id !in state.deselected
+                    FilterChip(
+                        modifier = Modifier.padding(horizontal = 8.dp),
+                        selected = selected,
+                        leadingIcon = {
+                            // displaying an icon either way prevents resize
+                            if (selected) Icon(
+                                Icons.Filled.CheckCircle,
+                                tint = MaterialTheme.colorScheme.primary,
+                                contentDescription = null
+                            )
+                            else Icon(
+                                Icons.Outlined.CheckCircle,
+                                contentDescription = null
+                            )
+                        },
+                        onClick = {
+                            state.eventSink(ToggleDevice(device.toFilter()))
+                        },
+                        label = { Text(name) }
                     )
-                },
-                navigationIcon = {
-                    IconButton(onClick = { state.eventSink(Back) }) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Default.KeyboardArrowLeft,
-                            contentDescription = "Back"
-                        )
-                    }
-                }
-            )
-        }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier.padding(innerPadding)
-        ) {
-            if (state.dir == null) {
-                LazyRow {
-                    // link_is guaranteed to be unique, TODO ensure installation_id is also
-                    items(state.devices, key = { it.installation_id }) { device ->
-                        val name = device.deviceName() + if (device.self) " (this device)" else ""
-                        val selected = device.installation_id !in state.deselected
-                        FilterChip(
-                            modifier = Modifier.padding(horizontal = 8.dp),
-                            selected = selected,
-                            leadingIcon = {
-                                // displaying an icon either way prevents resize
-                                if (selected) Icon(
-                                    Icons.Filled.CheckCircle,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    contentDescription = null
-                                )
-                                else Icon(
-                                    Icons.Outlined.CheckCircle,
-                                    contentDescription = null
-                                )
-                            },
-                            onClick = {
-                                state.eventSink(ToggleDevice(device.toFilter()))
-                            },
-                            label = { Text(name) }
-                        )
-                    }
                 }
             }
+        }
 
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(140.dp)
-            ) {
-                // TODO contentType, in flow insert header?
-                items(state.medias, { it.media.id }) { media ->
-                    Box(modifier = Modifier.clickable {
-                        state.eventSink(MediaClicked(media))
-                    }) {
-                        // loading the thumbnail is slow, don't do it in the flow
-                        // lazy load images, don't load all before showing the list
-                        AsyncImage(
-                            modifier = Modifier.aspectRatio(1f)
-                                .fillMaxSize()
-                                // TODO no border to the outside
-                                //.border(1.dp, Color.White)
-                                .drawWithCache {
-                                    val gradient = Brush.verticalGradient(
-                                        colors = listOf(Color.Transparent, Color.Black),
-                                        startY = size.height / 3,
-                                        endY = size.height
-                                    )
-                                    onDrawWithContent {
-                                        drawContent()
-                                        drawRect(gradient, blendMode = BlendMode.Multiply)
-                                    }
-                                },
-                            model = media.media,
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop
-                        )
-                        Text(
-                            modifier = Modifier.align(Alignment.BottomStart).padding(10.dp),
-                            text = media.name,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color.White,
-                            maxLines = 1
-                        )
-                    }
+        LazyVerticalGrid(
+            columns = GridCells.Adaptive(140.dp)
+        ) {
+            // TODO contentType, in flow insert header?
+            items(state.medias, { it.media.id }) { media ->
+                Box(modifier = Modifier.clickable {
+                    state.eventSink(MediaClicked(media))
+                }) {
+                    // loading the thumbnail is slow, don't do it in the flow
+                    // lazy load images, don't load all before showing the list
+                    AsyncImage(
+                        modifier = Modifier.aspectRatio(1f)
+                            .fillMaxSize()
+                            // TODO no border to the outside
+                            //.border(1.dp, Color.White)
+                            .drawWithCache {
+                                val gradient = Brush.verticalGradient(
+                                    colors = listOf(Color.Transparent, Color.Black),
+                                    startY = size.height / 3,
+                                    endY = size.height
+                                )
+                                onDrawWithContent {
+                                    drawContent()
+                                    drawRect(gradient, blendMode = BlendMode.Multiply)
+                                }
+                            },
+                        model = media.media.toThumbModel(),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop
+                    )
+                    Text(
+                        modifier = Modifier.align(Alignment.BottomStart).padding(10.dp),
+                        text = media.name,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White,
+                        maxLines = 1
+                    )
                 }
             }
         }

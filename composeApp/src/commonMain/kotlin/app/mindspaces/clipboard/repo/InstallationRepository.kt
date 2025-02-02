@@ -82,6 +82,8 @@ class InstallationRepository(db: Database, private val client: HttpClient) {
     fun self() =
         installationQueries.getSelf().asFlow().mapToOneOrNull(Dispatchers.IO).distinctUntilChanged()
 
+    fun selfAsOne() = installationQueries.getSelf().executeAsOneOrNull()
+
     fun saveLinks(links: List<ApiInstallationLink>) {
         installationQueries.transaction {
             val self = installationQueries.getSelf().executeAsOne()

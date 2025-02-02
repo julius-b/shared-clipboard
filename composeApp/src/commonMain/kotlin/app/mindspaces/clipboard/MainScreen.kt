@@ -30,7 +30,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.AddCircle
-import androidx.compose.material.icons.rounded.Phone
 import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Card
@@ -76,6 +75,7 @@ import app.mindspaces.clipboard.data.Permission
 import app.mindspaces.clipboard.data.PermissionState
 import app.mindspaces.clipboard.data.isGranted
 import app.mindspaces.clipboard.data.rememberPermissionState
+import app.mindspaces.clipboard.data.toThumbModel
 import app.mindspaces.clipboard.db.Account
 import app.mindspaces.clipboard.db.AllLinks
 import app.mindspaces.clipboard.db.Clip
@@ -107,8 +107,11 @@ import kotlinx.datetime.toLocalDateTime
 import me.tatarka.inject.annotations.Assisted
 import me.tatarka.inject.annotations.Inject
 import org.jetbrains.compose.resources.Font
+import org.jetbrains.compose.resources.painterResource
 import sharedclipboard.composeapp.generated.resources.Anton_Regular
 import sharedclipboard.composeapp.generated.resources.Res
+import sharedclipboard.composeapp.generated.resources.computer
+import sharedclipboard.composeapp.generated.resources.smartphone
 import software.amazon.lastmile.kotlin.inject.anvil.AppScope
 import java.util.UUID
 
@@ -322,21 +325,36 @@ fun MainView(state: MainScreen.State, modifier: Modifier = Modifier) {
                                     )
                                     Spacer(Modifier.height(2.dp))
                                     //Text("These devices have access to files on this device:")
-                                    LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
+                                    LazyColumn(
+                                        modifier = Modifier.heightIn(max = 300.dp),
+                                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
                                         items(state.devices) { device ->
                                             Row(
                                                 modifier = Modifier.fillMaxWidth(),
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
-                                                Text(device.deviceName())
-                                                // TODO better icon
-                                                Icon(
-                                                    modifier = Modifier.padding(horizontal = 6.dp),
-                                                    imageVector = Icons.Rounded.Phone,
-                                                    contentDescription = ""
+                                                Text(
+                                                    device.deviceName(),
+                                                    style = MaterialTheme.typography.titleSmall,
+                                                    fontWeight = if (device.self) FontWeight.Bold else null
                                                 )
+                                                if (device.os.isMobile) {
+                                                    Icon(
+                                                        modifier = Modifier.padding(horizontal = 6.dp),
+                                                        painter = painterResource(Res.drawable.smartphone),
+                                                        contentDescription = ""
+                                                    )
+                                                } else {
+                                                    Icon(
+                                                        modifier = Modifier.padding(horizontal = 6.dp),
+                                                        painter = painterResource(Res.drawable.computer),
+                                                        contentDescription = ""
+                                                    )
+                                                }
                                                 Spacer(Modifier.weight(1f))
-                                                if (device.self) {
+                                                // changes row size
+                                                /*if (device.self) {
                                                     SuggestionChip(
                                                         onClick = { },
                                                         // TODO remove black border
@@ -349,7 +367,7 @@ fun MainView(state: MainScreen.State, modifier: Modifier = Modifier) {
                                                         ),
                                                         //modifier = Modifier.align(Alignment.End)
                                                     )
-                                                }
+                                                }*/
                                             }
                                         }
                                     }
@@ -411,7 +429,7 @@ fun MainView(state: MainScreen.State, modifier: Modifier = Modifier) {
                                                     RoundedCornerShape(8.dp)
                                                 )
                                                 .clip(RoundedCornerShape(8.dp)),
-                                            model = media,
+                                            model = media.toThumbModel(),
                                             contentDescription = null,
                                             contentScale = ContentScale.Crop
                                         )

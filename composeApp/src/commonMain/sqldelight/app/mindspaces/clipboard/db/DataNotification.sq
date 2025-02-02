@@ -1,0 +1,19 @@
+import app.mindspaces.clipboard.api.ApiDataNotification.Target;
+import java.util.UUID;
+
+CREATE TABLE IF NOT EXISTS dataNotification (
+  id TEXT AS UUID PRIMARY KEY NOT NULL,
+  target TEXT AS Target NOT NULL
+);
+
+latest:
+SELECT * FROM dataNotification WHERE target = ? LIMIT 1;
+
+insert:
+INSERT OR REPLACE INTO dataNotification(id, target) VALUES ?;
+
+delete:
+DELETE FROM dataNotification WHERE id = ?;
+
+truncate:
+DELETE FROM dataNotification;

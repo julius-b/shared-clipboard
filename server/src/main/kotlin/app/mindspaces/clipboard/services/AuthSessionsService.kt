@@ -49,29 +49,6 @@ data class AuthSessionDAO(
     val deletedAt: Instant?
 )
 
-fun AuthSessionEntity.toDAO() = AuthSessionDAO(
-    id.value,
-    accountId.value,
-    installationId.value,
-    linkId.value,
-    secretUpdateId.value,
-    refreshToken,
-    createdAt,
-    deletedAt
-)
-
-fun AuthSessionDAO.toAuthSession(accessToken: String) = ApiAuthSession(
-    id,
-    accountId,
-    installationId,
-    linkId,
-    secretUpdateId,
-    refreshToken,
-    accessToken,
-    createdAt,
-    deletedAt
-)
-
 class AuthSessionsService {
     suspend fun all(): List<AuthSessionDAO> = tx {
         AuthSessionEntity.all().map { it.toDAO() }
@@ -105,5 +82,28 @@ class AuthSessionsService {
         }.toDAO()
     }
 }
+
+fun AuthSessionEntity.toDAO() = AuthSessionDAO(
+    id.value,
+    accountId.value,
+    installationId.value,
+    linkId.value,
+    secretUpdateId.value,
+    refreshToken,
+    createdAt,
+    deletedAt
+)
+
+fun AuthSessionDAO.toAuthSession(accessToken: String) = ApiAuthSession(
+    id,
+    accountId,
+    installationId,
+    linkId,
+    secretUpdateId,
+    refreshToken,
+    accessToken,
+    createdAt,
+    deletedAt
+)
 
 val authSessionsService = AuthSessionsService()

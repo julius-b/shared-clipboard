@@ -60,22 +60,6 @@ class AccountEntity(id: EntityID<UUID>) : UUIDEntity(id) {
     var deletedAt by Accounts.deletedAt
 }
 
-fun AccountEntity.toDTO() =
-    // profileId?.value, bannerId?.value
-    ApiAccount(
-        id.value,
-        type,
-        auth,
-        handle,
-        name,
-        desc,
-        secret,
-        UUID.randomUUID(),
-        UUID.randomUUID(),
-        createdAt,
-        deletedAt
-    )
-
 object SecretUpdates : UUIDTable() {
     val accountId = reference("account_id", Accounts)
     val secret = varchar("secret", 1000)
@@ -100,7 +84,7 @@ class AccountsService {
         AccountEntity.all().map(AccountEntity::toDTO)
     }
 
-    // TODO filter deletedAt
+    // TODO filter deletedAt unless ?all
     suspend fun get(id: UUID): ApiAccount? = tx {
         AccountEntity.findById(id)?.toDTO()
     }
@@ -165,5 +149,20 @@ class AccountsService {
 fun String.sanitizeHandle() = this.trim().lowercase()
 fun String.sanitizeSecret() = this.trim().replaceFirstChar { it.lowercaseChar() }
 fun String.sanitizeName() = this.trim()
+
+fun AccountEntity.toDTO() = ApiAccount(
+    id.value,
+    type,
+    auth,
+    handle,
+    name,
+    desc,
+    secret,
+    UUID.randomUUID(),
+    UUID.randomUUID(),
+    createdAt,
+    deletedAt,
+    //properties.map(AccountPropertyEntity::toDTO)
+)
 
 val accountsService = AccountsService()

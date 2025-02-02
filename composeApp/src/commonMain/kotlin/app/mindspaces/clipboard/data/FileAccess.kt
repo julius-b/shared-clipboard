@@ -84,6 +84,9 @@ suspend fun generateThumbnails(mediaRepository: MediaRepository, appDirs: AppDir
     }
 }
 
+// TODO cross platform
+fun String.fileName() = this.substringAfterLast('/')
+
 expect fun getThumbPath(appDirs: AppDirs, mediaId: UUID): File
 
 expect suspend fun getThumbBitmap(appDirs: AppDirs, media: Media): BitmapImage?

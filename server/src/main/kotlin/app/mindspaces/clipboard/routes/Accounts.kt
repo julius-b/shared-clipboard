@@ -153,7 +153,7 @@ fun Route.accountsApi() {
         authenticate("auth-jwt") {
             get {
                 val accounts = accountsService.all()
-                call.respond(ApiSuccessResponse(count = accounts.size, data = accounts))
+                call.respond(ApiSuccessResponse(accounts.size, accounts))
             }
             get("{id}") {
                 val id = UUID.fromString(call.parameters["id"])
@@ -202,17 +202,14 @@ fun Route.accountsApi() {
                     log.info("get - handle: $handle, self-id: $selfId")
 
                     val links = accountLinksService.listByAccount(selfId)
-                    call.respond(ApiSuccessResponse(count = links.size, data = links))
+                    call.respond(ApiSuccessResponse(links.size, links))
                 }
             }
             get("{id}/installations") {
                 val accountId = UUID.fromString(call.parameters["id"])
 
                 val peerInstallations = installationsService.listLinks(accountId)
-                call.respond(
-                    HttpStatusCode.OK,
-                    ApiSuccessResponse(count = peerInstallations.size, data = peerInstallations)
-                )
+                call.respond(ApiSuccessResponse(peerInstallations.size, peerInstallations))
             }
         }
         route("properties") {

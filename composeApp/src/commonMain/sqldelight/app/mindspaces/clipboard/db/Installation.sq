@@ -46,9 +46,9 @@ INSERT OR REPLACE INTO installationLink (id, name, account_id, installation_id, 
 
 -- joins create custom types anyway
 allLinks:
-SELECT link.id AS link_id, link.installation_id AS installation_id, link.name AS link_name, installation.name AS installation_name, installation.self AS self
+SELECT link.id AS link_id, link.installation_id AS installation_id, link.name AS link_name, installation.name AS installation_name, installation.self AS self, installation.os
 FROM installationLink link
-JOIN installation ON installation.id = link.installation_id AND installation.self = 1
+JOIN installation ON installation.id = link.installation_id
 WHERE link.deleted_at IS NULL;
 
 truncateLinks:

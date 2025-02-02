@@ -1,9 +1,11 @@
 package app.mindspaces.clipboard.api
 
+import app.mindspaces.clipboard.db.DataNotification
 import app.mindspaces.clipboard.db.Media
 import app.mindspaces.clipboard.db.MediaRequest
 import app.mindspaces.clipboard.db.ThumbState
 import io.ktor.resources.Resource
+import java.util.UUID
 
 fun ApiMedia.toEntity() = Media(
     id,
@@ -24,6 +26,8 @@ fun ApiMedia.toEntity() = Media(
 
 // never receive media requests from this installation from api
 fun ApiMediaRequest.toEntity() = MediaRequest(id, false, mediaId, createdAt)
+
+fun ApiDataNotification.toEntity(id: UUID) = DataNotification(id, target)
 
 @Resource("/medias")
 class Medias {

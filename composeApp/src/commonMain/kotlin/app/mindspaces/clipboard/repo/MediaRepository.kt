@@ -4,13 +4,14 @@ import app.cash.sqldelight.TransactionWithoutReturn
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
-import app.mindspaces.clipboard.api.ApiErrorResponse
+import app.mindspaces.clipboard.api.ApiDataNotification.Target
 import app.mindspaces.clipboard.api.ApiInstallation
 import app.mindspaces.clipboard.api.ApiMedia
 import app.mindspaces.clipboard.api.ApiSuccessResponse
 import app.mindspaces.clipboard.api.MediaType
 import app.mindspaces.clipboard.api.Medias
 import app.mindspaces.clipboard.api.toEntity
+import app.mindspaces.clipboard.db.DataNotification
 import app.mindspaces.clipboard.db.Database
 import app.mindspaces.clipboard.db.Media
 import app.mindspaces.clipboard.db.MediaReceipt
@@ -44,12 +45,17 @@ import kotlin.time.Duration.Companion.seconds
 
 @Inject
 @SingleIn(AppScope::class)
-class MediaRepository(private val db: Database, private val client: HttpClient) {
+class MediaRepository(
+    private val db: Database,
+    private val client: HttpClient,
+    private val installationRepository: InstallationRepository
+) {
     private val log = Logger.withTag("MediaRepo")
 
     private val mediaQueries = db.mediaQueries
     private val mediaReceiptQueries = db.mediaReceiptQueries
     private val mediaRequestQueries = db.mediaRequestQueries
+    private val dataNotificationQueries = db.dataNotificationQueries
 
     fun sync() {
         log.d { "sync - querying roots..." }
@@ -62,6 +68,9 @@ class MediaRepository(private val db: Database, private val client: HttpClient) 
     private fun get(id: UUID): Media? {
         return mediaQueries.get(id).executeAsOneOrNull()
     }
+
+    fun query(id: UUID) =
+        mediaQueries.get(id).asFlow().mapToOneOrNull(Dispatchers.IO).distinctUntilChanged()
 
     // conflate / buffer(capacity = 1)
     // NOTE: only apply distinctUntilChanged() to the element (ie. after map), not the flow
@@ -98,7 +107,7 @@ class MediaRepository(private val db: Database, private val client: HttpClient) 
         val media = new(path, dir, cre, mod, size, mediaType)
         // TODO returning
         mediaQueries.insert(media)
-        return media;
+        return media
     }
 
     // TODO accept num
@@ -143,6 +152,12 @@ class MediaRepository(private val db: Database, private val client: HttpClient) 
             .distinctUntilChanged()
     }
 
+    // outstanding media notification
+    private fun dataNotifications(): Flow<DataNotification?> {
+        return dataNotificationQueries.latest(Target.Media).asFlow().mapToOneOrNull(Dispatchers.IO)
+            .distinctUntilChanged()
+    }
+
     private fun deleteRequest(reqId: UUID) {
         mediaRequestQueries.delete(reqId)
     }
@@ -152,26 +167,27 @@ class MediaRepository(private val db: Database, private val client: HttpClient) 
     }
 
     // local uses null, server just shouldn't return files from this installation
-    suspend fun load() {
+    private suspend fun load(): Boolean {
         try {
-            val resp = client.get(Medias)
-            if (!resp.status.isSuccess()) {
-                val err = resp.body<ApiErrorResponse>()
-                //return RepoResult.ValidationError(err.errors)
-                return
-            }
+            val resp = client.get(Medias())
+            if (!resp.status.isSuccess()) return false
             val success = resp.body<ApiSuccessResponse<List<ApiMedia>>>()
             val medias = success.data.map(ApiMedia::toEntity)
+            val self = installationRepository.selfAsOne() ?: return false
             db.transaction {
                 for (media in medias) {
-                    // TODO DO NOT SAVE media FROM SERVER WHERE installation_id = self!!
+                    if (media.installation_id == self.id) {
+                        log.e { "load - remote should not return self: ${media.id}" }
+                        continue
+                    }
                     mediaQueries.insert(media)
                     mediaReceiptQueries.insert(MediaReceipt(media.id))
                 }
             }
+            return true
         } catch (e: Throwable) {
             log.e(e) { "load - unexpected resp: $e" }
-            //return RepoResult.Empty(false)
+            return false
         }
     }
 
@@ -256,6 +272,7 @@ class MediaRepository(private val db: Database, private val client: HttpClient) 
                 }
 
                 try {
+                    // TODO save synced status...
                     if (!uploadData(media, true, inStream)) {
                         // TODO what if too big for upload? don't loop
                         log.w { "handle-requests - upload failed, assuming temporary..." }
@@ -277,10 +294,37 @@ class MediaRepository(private val db: Database, private val client: HttpClient) 
         }
     }
 
+    // receive updates from remote
+    suspend fun handleMediaUpdates() {
+        dataNotifications().collect { notification ->
+            if (notification == null) {
+                log.i { "handle-media-updates - out of work" }
+                return@collect
+            }
+            var cnt = 0
+            while (true) {
+                cnt++
+                log.i { "handle-media-updates - notification: $notification (cnt: #$cnt)" }
+                if (!load()) {
+                    log.w { "handle-media-updates - load failed, timeout..." }
+                    // TODO exponential
+                    delay(20.seconds)
+                    continue
+                }
+                log.d { "handle-media-updates - load successful, deleting notification..." }
+                dataNotificationQueries.delete(notification.id)
+                break
+            }
+        }
+    }
+
     fun localFile(path: String, cre: Long?, mod: Long, size: Long) =
         mediaQueries.getLocal(path, cre, mod, size).executeAsOneOrNull()
 
     fun saveRequest(req: MediaRequest) = mediaRequestQueries.insert(req)
+
+    fun saveDataNotification(notification: DataNotification) =
+        dataNotificationQueries.insert(notification)
 
     fun tx(block: TransactionWithoutReturn.() -> Unit) {
         mediaQueries.transaction(body = block)

@@ -57,19 +57,6 @@ class AccountPropertyEntity(id: EntityID<UUID>) : UUIDEntity(id) {
     var deletedAt by AccountProperties.deletedAt
 }
 
-fun AccountPropertyEntity.toDTO() = ApiAccountProperty(
-    id.value,
-    accountId?.value,
-    installationId.value,
-    type,
-    content,
-    verificationCode,
-    valid,
-    primary,
-    createdAt,
-    deletedAt
-)
-
 class AccountPropertiesService {
     private val log = KtorSimpleLogger("account-props-svc")
 
@@ -135,5 +122,18 @@ class AccountPropertiesService {
         AccountProperties.deleteWhere { AccountProperties.id eq id } > 0
     }
 }
+
+fun AccountPropertyEntity.toDTO() = ApiAccountProperty(
+    id.value,
+    accountId?.value,
+    installationId.value,
+    type,
+    content,
+    verificationCode,
+    valid,
+    primary,
+    createdAt,
+    deletedAt
+)
 
 val accountPropertiesService = AccountPropertiesService()

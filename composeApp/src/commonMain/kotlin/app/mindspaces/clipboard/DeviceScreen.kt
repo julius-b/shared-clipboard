@@ -1,5 +1,6 @@
 package app.mindspaces.clipboard
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -59,8 +60,11 @@ import kotlinx.coroutines.launch
 import me.tatarka.inject.annotations.Assisted
 import me.tatarka.inject.annotations.Inject
 import org.jetbrains.compose.resources.Font
+import org.jetbrains.compose.resources.painterResource
 import sharedclipboard.composeapp.generated.resources.Anton_Regular
 import sharedclipboard.composeapp.generated.resources.Res
+import sharedclipboard.composeapp.generated.resources.computer
+import sharedclipboard.composeapp.generated.resources.smartphone
 import software.amazon.lastmile.kotlin.inject.anvil.AppScope
 import java.util.UUID
 
@@ -203,7 +207,9 @@ fun DeviceView(state: DeviceScreen.State, modifier: Modifier = Modifier) {
         Column(
             modifier = Modifier.padding(innerPadding).padding(horizontal = 12.dp).fillMaxWidth()
         ) {
-            LazyColumn {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 items(state.devices) { device ->
                     DeviceCard(
                         device,
@@ -302,6 +308,32 @@ fun DeviceCard(
                         )
                     }
                 }
+            }
+            Row {
+                Text(
+                    "Platform: ${device.os}",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                if (device.os.isMobile) {
+                    Icon(
+                        modifier = Modifier.padding(horizontal = 6.dp),
+                        painter = painterResource(Res.drawable.smartphone),
+                        contentDescription = ""
+                    )
+                } else {
+                    Icon(
+                        modifier = Modifier.padding(horizontal = 6.dp),
+                        painter = painterResource(Res.drawable.computer),
+                        contentDescription = ""
+                    )
+                }
+            }
+            if (device.self) {
+                Text(
+                    "This device",
+                    style = MaterialTheme.typography.titleSmall
+                )
             }
         }
     }

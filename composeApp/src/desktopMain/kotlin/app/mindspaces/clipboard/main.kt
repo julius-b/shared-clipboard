@@ -45,7 +45,8 @@ fun main() = application {
 
         // TODO launch from menu bar thing
         LaunchedEffect(Unit) {
-            scope.launch {
+            // TODO supervisor-scope...
+            scope.launch(Dispatchers.IO) {
                 val rtClient = RealTimeClient(
                     component.httpClient,
                     component.installationRepository,
@@ -53,6 +54,10 @@ fun main() = application {
                     component.mediaRepository
                 )
                 rtClient.connect()
+            }
+
+            scope.launch(Dispatchers.IO) {
+                component.mediaRepository.handleMediaUpdates()
             }
 
             scope.launch(Dispatchers.IO) {
@@ -64,6 +69,7 @@ fun main() = application {
                     component.appDirs
                 )
             }
+
             scope.launch(Dispatchers.IO) {
                 generateThumbnails(component.mediaRepository, component.appDirs)
             }

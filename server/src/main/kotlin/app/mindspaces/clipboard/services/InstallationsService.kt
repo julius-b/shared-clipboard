@@ -39,9 +39,6 @@ class InstallationEntity(id: EntityID<UUID>) : UUIDEntity(id) {
     var deletedAt by Installations.deletedAt
 }
 
-fun InstallationEntity.toDTO() =
-    ApiInstallation(id.value, name, desc, os, client, createdAt, deletedAt)
-
 object InstallationLinks : UUIDTable() {
     val name = varchar("name", 50).nullable()
     val installationId = reference("installation_id", Installations)
@@ -66,16 +63,6 @@ class InstallationLinkEntity(id: EntityID<UUID>) : UUIDEntity(id) {
     var createdAt by InstallationLinks.createdAt
     var deletedAt by InstallationLinks.deletedAt
 }
-
-fun InstallationLinkEntity.toDTO() = ApiInstallationLink(
-    id.value,
-    name,
-    installationId.value,
-    installation.toDTO(),
-    accountId.value,
-    createdAt,
-    deletedAt
-)
 
 class InstallationsService {
     suspend fun all(): List<ApiInstallation> = tx {
@@ -141,5 +128,18 @@ class InstallationsService {
         Installations.deleteWhere { Installations.id eq id } > 0
     }
 }
+
+fun InstallationEntity.toDTO() =
+    ApiInstallation(id.value, name, desc, os, client, createdAt, deletedAt)
+
+fun InstallationLinkEntity.toDTO() = ApiInstallationLink(
+    id.value,
+    name,
+    installationId.value,
+    installation.toDTO(),
+    accountId.value,
+    createdAt,
+    deletedAt
+)
 
 val installationsService = InstallationsService()

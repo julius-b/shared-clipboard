@@ -16,4 +16,9 @@ sealed class Message {
     @Serializable
     @SerialName("devices")
     data class Devices(val devices: List<ApiInstallationLink>) : Message()
+
+    @Serializable
+    @SerialName("data_notification")
+    data class DataNotification(val notification: app.mindspaces.clipboard.api.ApiDataNotification) :
+        Message()
 }

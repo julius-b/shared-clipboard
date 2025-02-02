@@ -30,7 +30,7 @@ SELECT * FROM account WHERE handle = ? AND deleted_at IS NULL;
 
 -- note: only authSession for self is stored locally
 getSelf:
-SELECT * FROM account WHERE id = (SELECT account_id FROM authSession LIMIT 1);
+SELECT * FROM account WHERE id = (SELECT account_id FROM authSession WHERE deleted_at IS NULL LIMIT 1);
 
 truncate:
 DELETE FROM account;

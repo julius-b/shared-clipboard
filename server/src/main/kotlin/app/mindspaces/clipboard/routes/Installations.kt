@@ -29,7 +29,7 @@ fun Route.installationsApi() {
         }
         get {
             val installations = installationsService.all()
-            call.respond(ApiSuccessResponse(count = installations.size, data = installations))
+            call.respond(ApiSuccessResponse(installations.size, installations))
         }
         get("{id}") {
             val id = UUID.fromString(call.parameters["id"])

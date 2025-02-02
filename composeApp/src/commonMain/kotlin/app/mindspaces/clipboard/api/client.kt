@@ -18,12 +18,17 @@ import io.ktor.client.plugins.websocket.WebSockets
 import io.ktor.client.plugins.websocket.pingInterval
 import io.ktor.client.request.header
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.URLProtocol
 import io.ktor.http.isSuccess
 import io.ktor.http.path
 import io.ktor.serialization.kotlinx.KotlinxWebsocketSerializationConverter
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
 import kotlin.time.Duration.Companion.seconds
+
+const val Host = "localhost"
+const val Port = 8080
+val Proto = URLProtocol.HTTP
 
 fun newHttpClient(
     db: Database, onUnauthorized: () -> Unit
@@ -62,13 +67,12 @@ fun newHttpClient(
         // applies to http requests
         // for websocket, the protocol would be WS and path wouldn't contain api/v1
         defaultRequest {
-            host = "192.168.159.54"
-            //host = "localhost"
-            //host = "172.20.10.4"
-            port = 8080
+            host = Host
+            port = Port
             //host = Env.remote.host
             //port = Env.remote.port
             url {
+                protocol = Proto
                 //protocol = Env.remote.httpProto
                 path("api/v1/")
             }

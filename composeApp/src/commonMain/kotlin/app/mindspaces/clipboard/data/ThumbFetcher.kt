@@ -1,5 +1,8 @@
 package app.mindspaces.clipboard.data
 
+import app.mindspaces.clipboard.api.Host
+import app.mindspaces.clipboard.api.Port
+import app.mindspaces.clipboard.api.Proto
 import app.mindspaces.clipboard.db.Media
 import ca.gosyer.appdirs.AppDirs
 import co.touchlab.kermit.Logger
@@ -13,6 +16,7 @@ import kotlinx.coroutines.withTimeout
 import kotlin.time.Duration.Companion.seconds
 
 // TODO trigger request to download from remote?
+// TODO "MediaFetcher", model should be UUID/Type
 class ThumbFetcher(private val media: Media, private val appDirs: AppDirs) : Fetcher {
     private val log = Logger.withTag("thumb-fetcher")
 
@@ -46,3 +50,10 @@ class ThumbFetcher(private val media: Media, private val appDirs: AppDirs) : Fet
         }
     }
 }
+
+// TODO use http-client host...
+fun Media.toThumbModel(): Any =
+    if (installation_id == null) this else "${Proto.name}://$Host:$Port/api/v1/medias/$id/thumb/raw"
+
+fun Media.toFileModel(): Any =
+    if (installation_id == null) this else "${Proto.name}://$Host:$Port/api/v1/medias/$id/file/raw"

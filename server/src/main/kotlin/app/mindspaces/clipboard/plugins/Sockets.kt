@@ -1,7 +1,10 @@
 package app.mindspaces.clipboard.plugins
 
+import app.mindspaces.clipboard.api.ApiDataNotification
+import app.mindspaces.clipboard.api.ApiDataNotification.Target
 import app.mindspaces.clipboard.api.ApiMediaRequest
 import app.mindspaces.clipboard.api.Message
+import app.mindspaces.clipboard.api.Message.DataNotification
 import app.mindspaces.clipboard.api.Message.Devices
 import app.mindspaces.clipboard.api.Message.MediaRequest
 import app.mindspaces.clipboard.api.Message.Notice
@@ -29,6 +32,7 @@ import io.ktor.util.logging.KtorSimpleLogger
 import io.ktor.websocket.CloseReason
 import io.ktor.websocket.close
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -122,7 +126,18 @@ fun Application.configureSockets() {
                         msg(MediaRequest(req))
                     }
 
+                    // TODO verify if exists...
+                    log.info("[$accountId/$handle]: notifying about new data...")
+                    msg(DataNotification(ApiDataNotification(Target.Media)))
+
                     job = launch {
+                        launch {
+                            // TODO ...
+                            while (isActive) {
+                                delay(30.seconds)
+                                msg(DataNotification(ApiDataNotification(Target.Media)))
+                            }
+                        }
                         // TODO publish received media requests to account chan, on connect send currently existing (might be from before server start, etc.)
                         accountChan.recv.collect { message ->
                             sendSerialized(message)

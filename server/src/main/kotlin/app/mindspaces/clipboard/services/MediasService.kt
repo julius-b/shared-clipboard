@@ -55,23 +55,6 @@ class MediaEntity(id: EntityID<UUID>) : UUIDEntity(id) {
     val deletedAt by Medias.deletedAt
 }
 
-// TODO add MediaType to server-side api
-fun MediaEntity.toDTO() =
-    ApiMedia(
-        id.value,
-        path,
-        dir,
-        cre,
-        mod,
-        size,
-        hasThumb,
-        hasFile,
-        null,
-        installationId.value,
-        createdAt,
-        deletedAt
-    )
-
 object MediaReceipts : CompositeIdTable() {
     val mediaId = reference("media_id", Medias)
     val installationLinkId = reference("installation_link_id", InstallationLinks)
@@ -100,9 +83,6 @@ class MediaReceiptEntity(id: EntityID<CompositeID>) : CompositeEntity(id) {
     var createdAt by MediaReceipts.createdAt
     var deletedAt by MediaReceipts.deletedAt
 }
-
-fun MediaReceiptEntity.toDTO() =
-    ApiMediaReceipt(mediaId.value, installationLinkId.value, hasThumb, hasFile)
 
 // it's a word: https://en.wiktionary.org/wiki/medias#English
 class MediasService {
@@ -248,5 +228,24 @@ class MediasService {
             }.toDTO()
         }
 }
+
+// TODO add MediaType to server-side api
+fun MediaEntity.toDTO() = ApiMedia(
+    id.value,
+    path,
+    dir,
+    cre,
+    mod,
+    size,
+    hasThumb,
+    hasFile,
+    null,
+    installationId.value,
+    createdAt,
+    deletedAt
+)
+
+fun MediaReceiptEntity.toDTO() =
+    ApiMediaReceipt(mediaId.value, installationLinkId.value, hasThumb, hasFile)
 
 val mediasService = MediasService()

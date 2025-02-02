@@ -65,6 +65,10 @@ class SyncWorker(
             }
         }
 
+        launch {
+            mediaRepository.handleMediaUpdates()
+        }
+
         // never returns
         mediaRepository.handleRequests()
 

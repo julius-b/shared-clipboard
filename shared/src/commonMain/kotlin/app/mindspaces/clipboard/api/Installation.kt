@@ -39,7 +39,10 @@ data class ApiInstallation(
         iOS,
 
         @SerialName("web")
-        Web
+        Web;
+
+        val isMobile: Boolean
+            get() = this == Mobile || this == Android || this == iOS
     }
 }
 

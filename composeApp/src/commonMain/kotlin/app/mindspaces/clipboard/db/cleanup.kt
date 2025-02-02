@@ -7,6 +7,9 @@ fun cleanup(db: Database, full: Boolean = false) {
     Logger.withTag("cleanup").i { "cleanup(full=$full)..." }
     db.transaction {
         // TODO cleanup user-data (but most id device-specific not accounts-specific)
+        db.dataNotificationQueries.truncate()
+        db.mediaReceiptQueries.truncate()
+        db.mediaRequestQueries.truncate()
         db.accountPropertyQueries.truncate()
         db.authSessionQueries.truncate()
         db.installationQueries.truncateLinks()
@@ -17,8 +20,6 @@ fun cleanup(db: Database, full: Boolean = false) {
             // clip cannot be re-indexed -> keep sync-status separate
             // keep local-only note
             db.mediaQueries.truncate()
-            db.mediaReceiptQueries.truncate()
-            db.mediaRequestQueries.truncate()
             db.installationQueries.truncate()
         }
     }

@@ -90,6 +90,13 @@ class RealTimeClient(
                 }
                 installationRepository.saveLinks(devices)
             }
+
+            is Message.DataNotification -> {
+                val notification = msg.notification
+                val id = UUID.randomUUID()
+                log.i { "received data-notification, saving: $notification with id: $id" }
+                mediaRepository.saveDataNotification(notification.toEntity(id))
+            }
         }
 
         return true
