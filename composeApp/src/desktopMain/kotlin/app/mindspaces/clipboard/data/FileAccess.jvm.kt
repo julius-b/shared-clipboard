@@ -1,6 +1,5 @@
 package app.mindspaces.clipboard.data
 
-import app.mindspaces.clipboard.db.Media
 import ca.gosyer.appdirs.AppDirs
 import coil3.BitmapImage
 import coil3.asImage
@@ -18,7 +17,7 @@ actual fun getThumbPath(appDirs: AppDirs, mediaId: UUID): File {
     return thumb
 }
 
-actual suspend fun getThumbBitmap(appDirs: AppDirs, media: Media): BitmapImage? {
+actual suspend fun getThumbBitmap(appDirs: AppDirs, media: MediaFetcherModel): BitmapImage? {
     try {
         val bufferedImage: BufferedImage =
             withContext(Dispatchers.IO) {
@@ -27,7 +26,19 @@ actual suspend fun getThumbBitmap(appDirs: AppDirs, media: Media): BitmapImage? 
         //return bufferedImage.toComposeImageBitmap()
         return bufferedImage.toBitmap().asImage()
     } catch (e: Throwable) {
-        println("failed to load bitmap (${media.path}): $e")
+        println("failed to load thumb-bitmap (${media.path}): $e")
+        return null
+    }
+}
+
+actual suspend fun getFileBitmap(media: MediaFetcherModel): BitmapImage? {
+    try {
+        val bufferedImage: BufferedImage = withContext(Dispatchers.IO) {
+            ImageIO.read(File(media.path))
+        }
+        return bufferedImage.toBitmap().asImage()
+    } catch (e: Throwable) {
+        println("failed to load file-bitmap (${media.path}): $e")
         return null
     }
 }

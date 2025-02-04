@@ -4,6 +4,7 @@ import app.mindspaces.clipboard.api.ApiError
 import app.mindspaces.clipboard.api.ApiSuccessResponse
 import app.mindspaces.clipboard.api.KeyInstallationID
 import app.mindspaces.clipboard.api.MediaReceiptParams
+import app.mindspaces.clipboard.api.MediaType
 import app.mindspaces.clipboard.api.SUUID
 import app.mindspaces.clipboard.services.mediasService
 import io.ktor.http.HttpHeaders
@@ -44,7 +45,8 @@ data class MediaMeta(
     var dir: String? = null,
     var cre: Long? = null,
     var mod: Long? = null,
-    var size: Long? = null
+    var size: Long? = null,
+    var mediaType: MediaType? = null
 ) {
     fun isComplete() = path != null && dir != null && mod != null && size != null
 }
@@ -120,6 +122,7 @@ fun Route.mediasApi() {
                             when (part.name) {
                                 "path" -> meta.path = part.value
                                 "dir" -> meta.dir = part.value
+                                "media-type" -> meta.mediaType = MediaType.valueOf(part.value)
                                 "size" -> {
                                     try {
                                         meta.size = part.value.toLong()
@@ -201,6 +204,7 @@ fun Route.mediasApi() {
                     meta.cre,
                     meta.mod!!,
                     meta.size!!,
+                    meta.mediaType,
                     installationId,
                     isFile = type == UploadType.File
                 )

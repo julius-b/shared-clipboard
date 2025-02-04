@@ -13,13 +13,13 @@ CREATE TABLE IF NOT EXISTS media (
   cre INTEGER,
   mod INTEGER NOT NULL,
   size INTEGER NOT NULL,
+  -- android-generated only
+  mediaType TEXT AS MediaType,
   -- TODO DEFAULT ThumbState.Pending
   thumbState TEXT AS ThumbState NOT NULL,
   synced INTEGER AS Boolean NOT NULL DEFAULT 0,
   thumbRetryCount INTEGER NOT NULL DEFAULT 0,
   retryCount INTEGER NOT NULL DEFAULT 0,
-  -- android only
-  mediaType TEXT AS MediaType,
   installation_id TEXT AS UUID,
   created_at TEXT AS Instant NOT NULL,
   deleted_at TEXT AS Instant DEFAULT NULL

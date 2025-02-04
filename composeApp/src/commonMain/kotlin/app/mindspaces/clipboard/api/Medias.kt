@@ -14,11 +14,11 @@ fun ApiMedia.toEntity() = Media(
     cre,
     mod,
     size,
+    mediaType,
     ThumbState.fromRemote(hasThumb),
     hasFile,
     0,
     0,
-    mediaType,
     installationId,
     createdAt,
     deletedAt
@@ -36,6 +36,9 @@ class Medias {
 
     @Resource("{id}/thumb/raw")
     class ThumbRaw(val parent: Medias = Medias(), val id: SUUID)
+
+    @Resource("{id}/file/raw")
+    class FileRaw(val parent: Medias = Medias(), val id: SUUID)
 
     @Resource("{id}/receipts")
     class Receipts(val parent: Medias = Medias(), val id: SUUID)

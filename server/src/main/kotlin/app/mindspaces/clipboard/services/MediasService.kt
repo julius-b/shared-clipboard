@@ -2,6 +2,7 @@ package app.mindspaces.clipboard.services
 
 import app.mindspaces.clipboard.api.ApiMedia
 import app.mindspaces.clipboard.api.ApiMediaReceipt
+import app.mindspaces.clipboard.api.MediaType
 import app.mindspaces.clipboard.plugins.DatabaseSingleton.tx
 import io.ktor.util.logging.KtorSimpleLogger
 import kotlinx.datetime.Clock
@@ -31,6 +32,7 @@ object Medias : UUIDTable() {
     // ms
     val mod = long("mod")
     val size = long("size")
+    val mediaType = enumerationByName<MediaType>("media_type", 10).nullable().default(null)
     val hasThumb = bool("has_thumb").default(false)
     val hasFile = bool("has_file").default(false)
     val installationId = reference("installation_id", Installations)
@@ -48,6 +50,7 @@ class MediaEntity(id: EntityID<UUID>) : UUIDEntity(id) {
     var cre by Medias.cre
     var mod by Medias.mod
     var size by Medias.size
+    var mediaType by Medias.mediaType
     var hasThumb by Medias.hasThumb
     var hasFile by Medias.hasFile
     var installationId by Medias.installationId
@@ -170,6 +173,7 @@ class MediasService {
         cre: Long?,
         mod: Long,
         size: Long,
+        mediaType: MediaType?,
         installationId: UUID,
         isFile: Boolean
     ): ApiMedia =
@@ -193,6 +197,7 @@ class MediasService {
                 this.cre = cre
                 this.mod = mod
                 this.size = size
+                this.mediaType = mediaType
                 this.hasThumb = !isFile
                 this.hasFile = isFile
                 this.installationId = EntityID(installationId, Installations)
@@ -237,9 +242,9 @@ fun MediaEntity.toDTO() = ApiMedia(
     cre,
     mod,
     size,
+    mediaType,
     hasThumb,
     hasFile,
-    null,
     installationId.value,
     createdAt,
     deletedAt

@@ -22,7 +22,7 @@ Status: early development
 - Background work: [Android Work Manager](https://developer.android.com/topic/libraries/architecture/workmanager/)
   - [androidMain/SyncWorker.kt](composeApp/src/androidMain/kotlin/app/mindspaces/clipboard/work/SyncWorker.kt)
 - Image loading: [Coil3](https://github.com/coil-kt/coil)
-- UI: [Circuit](https://github.com/slackhq/circuit/)
+- Navigation: [Circuit](https://github.com/slackhq/circuit/)
 - Database: [SQLDelight](https://github.com/sqldelight/sqldelight) (generates typesafe Kotlin APIs from SQL)
   - migrations: [db/](composeApp/src/commonMain/sqldelight/app/mindspaces/clipboard/db)
 - Networking: [Ktor](https://ktor.io)
@@ -175,7 +175,7 @@ file_path="testdata/video.mp4"
 
 export media_id=$(uuidgen)
 size=$(wc -c < "$file_path")
-curl -X POST -F "path=/storage/emulated/0/Movies/SG-1 S04E06 Window of Opportunity.mp4" -F "file=@$file_path" -F "size=$size" -F "dir=/storage/emulated/0/Videos" -F "cre=$(date +%s%3N)" -F "mod=$(date +%s%3N)" -H "Installation-Id: $installation_id" "$host/api/v1/medias/$media_id/file"
+curl -X POST -F "path=/storage/emulated/0/Movies/SG-1 S04E06 Window of Opportunity.mp4" -F "file=@$file_path" -F "size=$size" -F "dir=/storage/emulated/0/Videos" -F "media-type=Video" -F "cre=$(date +%s%3N)" -F "mod=$(date +%s%3N)" -H "Installation-Id: $installation_id" "$host/api/v1/medias/$media_id/file"
 ```
 
 #### Download Thumbnail
@@ -216,3 +216,6 @@ curl -d '{"has_file":"true"}' -H "Authorization: Bearer $access_token" -H "Conte
 - end-to-end encryption using Noise
 - password hashing (preferably argon2id)
 - tests for stable components
+
+## Drawables:
+- src: https://fonts.google.com/icons, converted to xml using Resource Manager 'from local file'

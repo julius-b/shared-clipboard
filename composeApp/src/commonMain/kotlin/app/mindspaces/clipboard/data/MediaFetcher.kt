@@ -1,6 +1,7 @@
 package app.mindspaces.clipboard.data
 
 import app.mindspaces.clipboard.api.Host
+import app.mindspaces.clipboard.api.MediaType
 import app.mindspaces.clipboard.api.Port
 import app.mindspaces.clipboard.api.Proto
 import app.mindspaces.clipboard.db.Media
@@ -13,39 +14,49 @@ import coil3.fetch.ImageFetchResult
 import kotlinx.coroutines.Dispatchers.Default
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import java.util.UUID
 import kotlin.time.Duration.Companion.seconds
 
+data class MediaFetcherModel(
+    val id: UUID,
+    val path: String,
+    val type: MediaType?,
+    val isFile: Boolean
+)
+
+// handles local media requests
 // TODO trigger request to download from remote?
-// TODO "MediaFetcher", model should be UUID/Type
-class ThumbFetcher(private val media: Media, private val appDirs: AppDirs) : Fetcher {
-    private val log = Logger.withTag("thumb-fetcher")
+class MediaFetcher(private val model: MediaFetcherModel, private val appDirs: AppDirs) : Fetcher {
+    private val log = Logger.withTag("media-fetcher")
 
     override suspend fun fetch(): FetchResult? {
-        log.i { "fetching: ${media.path}..." }
+        log.i { "fetching (isFile: ${model.isFile}): ${model.path}..." }
         try {
             // withContext(IO) breaks for large video directories, no context switch (and Main) freezes the app -> Default
-            val bmp = withContext(Default) {
+            val bmp = if (model.isFile) getFileBitmap(model)
+            else withContext(Default) {
                 withTimeout(10.seconds) {
-                    getThumbBitmap(appDirs, media)
+                    getThumbBitmap(appDirs, model)
                 }
             }
-            if (bmp == null) log.w { "failed to fetch: ${media.path}" }
+            if (bmp == null) log.w { "failed to fetch (isFile: ${model.isFile}): ${model.path}" }
             //else log.d { "got thumb: ${model.media.path}" }
 
             if (bmp == null) {
-                log.w { "got null: ${media.path}" }
+                log.w { "got null (isFile: ${model.isFile}): ${model.path}" }
                 return null
             }
 
             return ImageFetchResult(
                 image = bmp,
-                isSampled = true,
+                // TODO effect of this value?
+                isSampled = !model.isFile,
                 // TODO effect of this value?
                 dataSource = DataSource.DISK
             )
         } catch (e: Throwable) {
             // eg. LeftCompositionCancellationException
-            log.e(e) { "failed to fetch path: ${media.path}" }
+            log.e(e) { "failed to fetch path (isFile: ${model.isFile}): ${model.path}" }
             return null
         }
     }
@@ -53,7 +64,11 @@ class ThumbFetcher(private val media: Media, private val appDirs: AppDirs) : Fet
 
 // TODO use http-client host...
 fun Media.toThumbModel(): Any =
-    if (installation_id == null) this else "${Proto.name}://$Host:$Port/api/v1/medias/$id/thumb/raw"
+    if (installation_id == null) MediaFetcherModel(id, path, mediaType, false)
+    else "${Proto.name}://$Host:$Port/api/v1/medias/$id/thumb/raw"
 
+// TODO handle 404 on url
+// TODO handle possible missing path (outdated local cache) from fetcher in detail view
 fun Media.toFileModel(): Any =
-    if (installation_id == null) this else "${Proto.name}://$Host:$Port/api/v1/medias/$id/file/raw"
+    if (installation_id == null) MediaFetcherModel(id, path, mediaType, true)
+    else "${Proto.name}://$Host:$Port/api/v1/medias/$id/file/raw"

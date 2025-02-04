@@ -17,17 +17,24 @@ import app.mindspaces.clipboard.db.Media
 import app.mindspaces.clipboard.db.MediaReceipt
 import app.mindspaces.clipboard.db.MediaRequest
 import app.mindspaces.clipboard.db.ThumbState
+import ca.gosyer.appdirs.AppDirs
 import co.touchlab.kermit.Logger
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.resources.get
+import io.ktor.client.plugins.resources.prepareGet
 import io.ktor.client.plugins.timeout
 import io.ktor.client.request.forms.InputProvider
 import io.ktor.client.request.forms.formData
 import io.ktor.client.request.forms.submitFormWithBinaryData
 import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
+import io.ktor.http.contentLength
 import io.ktor.http.isSuccess
+import io.ktor.utils.io.ByteReadChannel
+import io.ktor.utils.io.core.isEmpty
+import io.ktor.utils.io.core.readBytes
+import io.ktor.utils.io.readRemaining
 import io.ktor.utils.io.streams.asInput
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -48,7 +55,8 @@ import kotlin.time.Duration.Companion.seconds
 class MediaRepository(
     private val db: Database,
     private val client: HttpClient,
-    private val installationRepository: InstallationRepository
+    private val installationRepository: InstallationRepository,
+    private val appDirs: AppDirs
 ) {
     private val log = Logger.withTag("MediaRepo")
 
@@ -202,6 +210,7 @@ class MediaRepository(
                     append("dir", media.dir)
                     media.cre?.let { append("cre", it) }
                     append("mod", media.mod)
+                    media.mediaType?.name?.let { append("media-type", it) }
                     // `InputProvider` adds Content-Length, actual file body
                     // file variant: `InputProvider(file.length()) { file.inputStream().asInput() }`
                     append(
@@ -318,6 +327,28 @@ class MediaRepository(
         }
     }
 
+    // TODO let VideoPlayer handle download using authenticated ktor client (?)
+    suspend fun downloadMedia(id: UUID): String {
+        // TODO if exists, ensure it's the full size, return early
+        // -> save to -<uuid>, remove all <uuid> on new request, then check if file exists
+        val thumbsDir = File(appDirs.getUserDataDir(), "medias")
+        thumbsDir.mkdirs()
+        val file = File(thumbsDir, id.toString())
+        client.prepareGet(Medias.FileRaw(id = id)).execute { httpResponse ->
+            val channel: ByteReadChannel = httpResponse.body()
+            while (!channel.isClosedForRead) {
+                val packet = channel.readRemaining(DEFAULT_BUFFER_SIZE.toLong())
+                while (!packet.isEmpty) {
+                    val bytes = packet.readBytes()
+                    file.appendBytes(bytes)
+                    println("Received ${file.length()} bytes from ${httpResponse.contentLength()}")
+                }
+            }
+            println("A file saved to ${file.path}")
+        }
+        return file.path
+    }
+
     fun localFile(path: String, cre: Long?, mod: Long, size: Long) =
         mediaQueries.getLocal(path, cre, mod, size).executeAsOneOrNull()
 
@@ -345,11 +376,11 @@ class MediaRepository(
         cre,
         mod,
         size,
+        mediaType,
         ThumbState.Pending,
         false,
         0,
         0,
-        mediaType,
         null,
         Clock.System.now(),
         null

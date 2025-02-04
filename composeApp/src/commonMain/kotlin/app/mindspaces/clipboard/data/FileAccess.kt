@@ -1,6 +1,5 @@
 package app.mindspaces.clipboard.data
 
-import app.mindspaces.clipboard.db.Media
 import app.mindspaces.clipboard.repo.MediaRepository
 import ca.gosyer.appdirs.AppDirs
 import co.touchlab.kermit.Logger
@@ -89,4 +88,6 @@ fun String.fileName() = this.substringAfterLast('/')
 
 expect fun getThumbPath(appDirs: AppDirs, mediaId: UUID): File
 
-expect suspend fun getThumbBitmap(appDirs: AppDirs, media: Media): BitmapImage?
+expect suspend fun getThumbBitmap(appDirs: AppDirs, media: MediaFetcherModel): BitmapImage?
+
+expect suspend fun getFileBitmap(media: MediaFetcherModel): BitmapImage?

@@ -303,7 +303,7 @@ fun MainView(state: MainScreen.State, modifier: Modifier = Modifier) {
                                     )
                                     Spacer(Modifier.height(2.dp))
                                     // TODO "or login"
-                                    Text("Create an account to share your clipboard entries with other devices")
+                                    Text("Create an account to share your clipboard entries with other devices. If you already have an account, you can also log in.")
                                     Spacer(Modifier.height(8.dp))
                                     TextButton(
                                         onClick = {
@@ -311,7 +311,7 @@ fun MainView(state: MainScreen.State, modifier: Modifier = Modifier) {
                                         },
                                         shape = ShapeDefaults.Medium,
                                         modifier = Modifier.align(Alignment.End)
-                                    ) { Text("Create Account") }
+                                    ) { Text("Create Account or Log In") }
                                 }
                             }
 

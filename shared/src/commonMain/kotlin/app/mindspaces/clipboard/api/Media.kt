@@ -12,9 +12,9 @@ data class ApiMedia(
     val cre: Long?,
     val mod: Long,
     val size: Long,
+    @SerialName("media_type") val mediaType: MediaType?,
     @SerialName("has_thumb") val hasThumb: Boolean,
     @SerialName("has_file") val hasFile: Boolean,
-    @SerialName("media_type") val mediaType: MediaType?,
     @SerialName("installation_id") val installationId: SUUID,
     @SerialName("created_at") val createdAt: Instant,
     @SerialName("deleted_at") val deletedAt: Instant?

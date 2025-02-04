@@ -2,8 +2,8 @@ package app.mindspaces.clipboard.di
 
 // src: https://github.com/simonlebras/rickandmorty/blob/main/core/coil-logger/src/commonMain/kotlin/app/rickandmorty/core/coil/logger/CoilLoggerComponent.kt
 
-import app.mindspaces.clipboard.data.ThumbFetcher
-import app.mindspaces.clipboard.db.Media
+import app.mindspaces.clipboard.data.MediaFetcher
+import app.mindspaces.clipboard.data.MediaFetcherModel
 import ca.gosyer.appdirs.AppDirs
 import co.touchlab.kermit.Severity
 import coil3.ImageLoader
@@ -37,8 +37,8 @@ interface ImageLoaderComponent {
     ): ImageLoader = ImageLoader.Builder(context)
         .components {
             add(KtorNetworkFetcherFactory(httpClient))
-            add(Fetcher.Factory<Media> { data, options, imageLoader ->
-                ThumbFetcher(data, appDirs)
+            add(Fetcher.Factory<MediaFetcherModel> { data, options, imageLoader ->
+                MediaFetcher(data, appDirs)
             })
         }
         .logger(logger)

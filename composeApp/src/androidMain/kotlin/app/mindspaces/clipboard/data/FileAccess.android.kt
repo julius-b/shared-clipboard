@@ -3,6 +3,7 @@ package app.mindspaces.clipboard.data
 import android.content.ContentResolver
 import android.database.Cursor
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.media.ThumbnailUtils
 import android.net.Uri
 import android.os.Build
@@ -10,7 +11,6 @@ import android.os.CancellationSignal
 import android.provider.MediaStore
 import android.util.Size
 import app.mindspaces.clipboard.api.MediaType
-import app.mindspaces.clipboard.db.Media
 import app.mindspaces.clipboard.repo.MediaRepository
 import ca.gosyer.appdirs.AppDirs
 import co.touchlab.kermit.Logger
@@ -30,6 +30,7 @@ import java.io.IOException
 import java.util.UUID
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
+
 
 // android doesn't save thumbnails locally, always queries data-store
 // TODO consider saving media-store-id in Media
@@ -120,7 +121,7 @@ fun getThumbBitmap(
     }
 }
 
-actual suspend fun getThumbBitmap(appDirs: AppDirs, media: Media): BitmapImage? =
+actual suspend fun getThumbBitmap(appDirs: AppDirs, media: MediaFetcherModel): BitmapImage? =
     suspendCancellableCoroutine { cont ->
         val signal = CancellationSignal()
         cont.invokeOnCancellation {
@@ -138,9 +139,9 @@ actual suspend fun getThumbBitmap(appDirs: AppDirs, media: Media): BitmapImage? 
         }
 
         try {
-            if (media.mediaType == null) return@suspendCancellableCoroutine
+            if (media.type == null) return@suspendCancellableCoroutine
             val bitmap =
-                getThumbBitmap(media.mediaType, media.path) ?: return@suspendCancellableCoroutine
+                getThumbBitmap(media.type, media.path) ?: return@suspendCancellableCoroutine
             //println("got thumb ${media.mediaType}, ${media.path}")
             //return bitmap.asImageBitmap()
             cont.resumeWith(Result.success(bitmap.asImage()))
@@ -150,6 +151,17 @@ actual suspend fun getThumbBitmap(appDirs: AppDirs, media: Media): BitmapImage? 
             scope.cancel()
         }
     }
+
+actual suspend fun getFileBitmap(media: MediaFetcherModel): BitmapImage? {
+    try {
+        val bmOptions = BitmapFactory.Options()
+        val bitmap = BitmapFactory.decodeFile(media.path, bmOptions)
+        return bitmap.asImage()
+    } catch (e: Throwable) {
+        println("failed to load file-bitmap (${media.path}): $e")
+        return null
+    }
+}
 
 fun listAllMedia(mediaRepository: MediaRepository, contentResolver: ContentResolver) {
     // TODO DATE_TAKEN
