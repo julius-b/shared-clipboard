@@ -90,4 +90,5 @@ expect fun getThumbPath(appDirs: AppDirs, mediaId: UUID): File
 
 expect suspend fun getThumbBitmap(appDirs: AppDirs, media: MediaFetcherModel): BitmapImage?
 
+// TODO performance on large files?
 expect suspend fun getFileBitmap(media: MediaFetcherModel): BitmapImage?

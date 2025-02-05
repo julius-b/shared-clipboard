@@ -32,8 +32,6 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.contentLength
 import io.ktor.http.isSuccess
 import io.ktor.utils.io.ByteReadChannel
-import io.ktor.utils.io.core.isEmpty
-import io.ktor.utils.io.core.readBytes
 import io.ktor.utils.io.readRemaining
 import io.ktor.utils.io.streams.asInput
 import kotlinx.coroutines.Dispatchers
@@ -42,6 +40,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.datetime.Clock
+import kotlinx.io.IOException
+import kotlinx.io.readByteArray
 import me.tatarka.inject.annotations.Inject
 import software.amazon.lastmile.kotlin.inject.anvil.AppScope
 import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
@@ -328,23 +328,33 @@ class MediaRepository(
     }
 
     // TODO let VideoPlayer handle download using authenticated ktor client (?)
-    suspend fun downloadMedia(id: UUID): String {
-        // TODO if exists, ensure it's the full size, return early
-        // -> save to -<uuid>, remove all <uuid> on new request, then check if file exists
+    // progress may never be called
+    suspend fun downloadMedia(id: UUID, size: Long, progress: suspend (Int) -> Unit): String {
+        // concurrent: save to -<uuid> (crdownload), remove all <uuid> on new request, then check if file exists
         val thumbsDir = File(appDirs.getUserDataDir(), "medias")
         thumbsDir.mkdirs()
         val file = File(thumbsDir, id.toString())
+        if (file.exists()) {
+            log.i { "download-media($id) - file exists: ${file.path}" }
+            if (file.length() == size) return file.path
+            log.w { "download-media($id) - size does not match: ${file.length()} != $size, deleting..." }
+            if (!file.delete()) throw IOException("file size does not match: ${file.length()} != $size")
+        }
         client.prepareGet(Medias.FileRaw(id = id)).execute { httpResponse ->
             val channel: ByteReadChannel = httpResponse.body()
             while (!channel.isClosedForRead) {
                 val packet = channel.readRemaining(DEFAULT_BUFFER_SIZE.toLong())
-                while (!packet.isEmpty) {
-                    val bytes = packet.readBytes()
+                while (!packet.exhausted()) {
+                    val bytes = packet.readByteArray()
                     file.appendBytes(bytes)
-                    println("Received ${file.length()} bytes from ${httpResponse.contentLength()}")
+                    httpResponse.contentLength()?.let {
+                        val percentage = file.length().toFloat() / it * 100L
+                        // TODO context switch slows down download significantly... need to decouple?
+                        progress(percentage.toInt())
+                    }
                 }
             }
-            println("A file saved to ${file.path}")
+            log.i { "download-media($id) - saved: ${file.path}" }
         }
         return file.path
     }

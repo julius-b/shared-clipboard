@@ -29,7 +29,9 @@ fun SimpleScaffold(
     title: String,
     horizontal: Dp = 0.dp,
     onBack: () -> Unit,
-    content: @Composable ColumnScope.() -> Unit = {}
+    onAction: () -> Unit = {},
+    actionIcon: @Composable (() -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit
 ) {
     Scaffold(
         modifier = modifier,
@@ -48,6 +50,13 @@ fun SimpleScaffold(
                             imageVector = Icons.AutoMirrored.Default.KeyboardArrowLeft,
                             contentDescription = "Back"
                         )
+                    }
+                },
+                actions = {
+                    if (actionIcon != null) {
+                        IconButton(onClick = { onAction() }) {
+                            actionIcon()
+                        }
                     }
                 }
             )

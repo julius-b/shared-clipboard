@@ -24,7 +24,7 @@ data class MediaFetcherModel(
     val isFile: Boolean
 )
 
-// handles local media requests
+// handles local media (image) requests
 // TODO trigger request to download from remote?
 class MediaFetcher(private val model: MediaFetcherModel, private val appDirs: AppDirs) : Fetcher {
     private val log = Logger.withTag("media-fetcher")

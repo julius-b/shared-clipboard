@@ -239,7 +239,6 @@ fun MainView(state: MainScreen.State, modifier: Modifier = Modifier) {
                         state.eventSink(ViewSettings)
                     }) {
                         Icon(
-                            modifier = Modifier.fillMaxHeight(),
                             imageVector = Icons.Filled.Settings,
                             contentDescription = "Settings"
                         )
