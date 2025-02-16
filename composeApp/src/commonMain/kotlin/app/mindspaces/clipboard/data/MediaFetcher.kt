@@ -11,6 +11,8 @@ import coil3.decode.DataSource
 import coil3.fetch.FetchResult
 import coil3.fetch.Fetcher
 import coil3.fetch.ImageFetchResult
+import coil3.key.Keyer
+import coil3.request.Options
 import kotlinx.coroutines.Dispatchers.Default
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -59,6 +61,13 @@ class MediaFetcher(private val model: MediaFetcherModel, private val appDirs: Ap
             log.e(e) { "failed to fetch path (isFile: ${model.isFile}): ${model.path}" }
             return null
         }
+    }
+}
+
+class MediaFetcherModelKeyer : Keyer<MediaFetcherModel> {
+    // MediaFetcherModel is only used for local requests, id is enough
+    override fun key(data: MediaFetcherModel, options: Options): String {
+        return "${data::class.simpleName}_${data.id}"
     }
 }
 

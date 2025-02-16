@@ -1,6 +1,7 @@
 package app.mindspaces.clipboard.di
 
 import android.app.Application
+import android.content.Context
 import app.mindspaces.clipboard.ClipboardApp
 import app.mindspaces.clipboard.db.DriverFactory
 import app.mindspaces.clipboard.work.AppWorkerFactory
@@ -23,6 +24,11 @@ abstract class AndroidApplicationComponent(@get:Provides protected val applicati
     override fun getDriverFactory() = DriverFactory(application)
 
     override fun providePlatformContext(): PlatformContext = application.applicationContext
+
+    @AppContext
+    @Provides
+    fun provideApplicationContext(application: Application): Context =
+        application.applicationContext
 
     companion object
 }

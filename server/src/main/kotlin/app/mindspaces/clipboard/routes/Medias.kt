@@ -93,15 +93,16 @@ fun Route.mediasApi() {
             }
             log.info("[m:$lockKey] lock acquired")
             try {
-                val contentLength =
-                    call.request.header(HttpHeaders.ContentLength)?.toDouble()
-                        ?: throw ValidationException(HttpHeaders.ContentLength, ApiError.Required())
                 val maxFileSize =
                     if (type == UploadType.Thumb) ThumbMaxSize else FileMaxSize
+                // TODO client inputstream (for thumb) does not include content-length
+                /*val contentLength =
+                    call.request.header(HttpHeaders.ContentLength)?.toDouble()
+                        ?: throw ValidationException(HttpHeaders.ContentLength, ApiError.Required())
                 if (contentLength > maxFileSize) throw ValidationException(
                     HttpHeaders.ContentLength,
                     ApiError.Constraint("$contentLength", max = maxFileSize)
-                )
+                )*/
 
                 // should query current hasFile/Thumb state after acquiring lock
                 if (file.exists()) {
@@ -172,7 +173,7 @@ fun Route.mediasApi() {
                                 }
                             }
                             fileSize = file.length()
-                            log.info("file-item received - type: $type, mediaId: $mediaId, form(field-name: '$formFieldName', file-name: '$formFileName') (fileSize: $fileSize)")
+                            log.info("received file-item - type: $type, mediaId: $mediaId, form(field-name: '$formFieldName', file-name: '$formFileName') (fileSize: $fileSize)")
 
                             /*val fileType = part.contentType?.contentSubtype
                             val ACCEPTED_IMAGE_TYPES = listOf("PNG", "JPG", "JPEG")

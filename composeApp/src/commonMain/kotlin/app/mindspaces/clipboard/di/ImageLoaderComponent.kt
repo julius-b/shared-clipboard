@@ -4,6 +4,7 @@ package app.mindspaces.clipboard.di
 
 import app.mindspaces.clipboard.data.MediaFetcher
 import app.mindspaces.clipboard.data.MediaFetcherModel
+import app.mindspaces.clipboard.data.MediaFetcherModelKeyer
 import ca.gosyer.appdirs.AppDirs
 import co.touchlab.kermit.Severity
 import coil3.ImageLoader
@@ -40,6 +41,7 @@ interface ImageLoaderComponent {
             add(Fetcher.Factory<MediaFetcherModel> { data, options, imageLoader ->
                 MediaFetcher(data, appDirs)
             })
+            add(MediaFetcherModelKeyer())
         }
         .logger(logger)
         .build()

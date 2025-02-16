@@ -5,7 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
- import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
@@ -32,12 +32,14 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import app.mindspaces.clipboard.SettingsScreen.Event.Back
 import app.mindspaces.clipboard.SettingsScreen.Event.ConfirmLogout
+import app.mindspaces.clipboard.SettingsScreen.Event.RetryThumbGen
 import app.mindspaces.clipboard.SettingsScreen.Event.ToggleLogout
 import app.mindspaces.clipboard.components.SimpleScaffold
 import app.mindspaces.clipboard.db.Account
 import app.mindspaces.clipboard.db.AccountProperty
 import app.mindspaces.clipboard.parcel.CommonParcelize
 import app.mindspaces.clipboard.repo.AuthRepository
+import app.mindspaces.clipboard.repo.MediaRepository
 import co.touchlab.kermit.Logger
 import com.slack.circuit.codegen.annotations.CircuitInject
 import com.slack.circuit.retained.collectAsRetainedState
@@ -64,6 +66,7 @@ data object SettingsScreen : Screen {
     ) : CircuitUiState
 
     sealed interface Event : CircuitUiEvent {
+        data object RetryThumbGen : Event
         data object ConfirmLogout : Event
         data object ToggleLogout : Event
         data object Back : Event
@@ -74,7 +77,8 @@ data object SettingsScreen : Screen {
 @Inject
 class SettingsPresenter(
     @Assisted private val navigator: Navigator,
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val mediaRepository: MediaRepository
 ) : Presenter<SettingsScreen.State> {
     private val log = Logger.withTag("SettingsScreen")
 
@@ -89,6 +93,12 @@ class SettingsPresenter(
 
         return SettingsScreen.State(self, properties, isLogout) { event ->
             when (event) {
+                is RetryThumbGen -> {
+                    scope.launch {
+                        mediaRepository.resetThumbGenerationFailed()
+                    }
+                }
+
                 is ConfirmLogout -> {
                     scope.launch {
                         // TODO notify server
@@ -115,6 +125,13 @@ fun SettingsView(state: SettingsScreen.State, modifier: Modifier = Modifier) {
 
         AccountBox(state.self, state.properties) {
             state.eventSink(ToggleLogout)
+        }
+
+        Spacer(Modifier.height(8.dp))
+        TextButton(
+            onClick = { state.eventSink(RetryThumbGen) },
+        ) {
+            Text("Retry generating failed thumbnails")
         }
     }
 }

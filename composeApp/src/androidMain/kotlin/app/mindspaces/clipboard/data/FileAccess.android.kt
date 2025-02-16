@@ -1,6 +1,8 @@
 package app.mindspaces.clipboard.data
 
 import android.content.ContentResolver
+import android.content.Context
+import android.content.Intent
 import android.database.Cursor
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -9,19 +11,28 @@ import android.net.Uri
 import android.os.Build
 import android.os.CancellationSignal
 import android.provider.MediaStore
+import android.util.Log
 import android.util.Size
+import android.webkit.MimeTypeMap
+import androidx.compose.ui.platform.UriHandler
+import androidx.core.content.FileProvider
 import app.mindspaces.clipboard.api.MediaType
+import app.mindspaces.clipboard.di.AppContext
 import app.mindspaces.clipboard.repo.MediaRepository
 import ca.gosyer.appdirs.AppDirs
 import co.touchlab.kermit.Logger
 import coil3.BitmapImage
 import coil3.asImage
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
+import me.tatarka.inject.annotations.Inject
+import software.amazon.lastmile.kotlin.inject.anvil.AppScope
+import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -32,7 +43,7 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 
-// android doesn't save thumbnails locally, always queries data-store
+// on android don't save thumbnails locally, always queries data-store
 // TODO consider saving media-store-id in Media
 suspend fun syncThumbnails(
     mediaRepository: MediaRepository,
@@ -42,7 +53,7 @@ suspend fun syncThumbnails(
     val log = Logger.withTag("syncThumbnails")
 
     // one file at a time, ensures it's a current state
-    mediaRepository.pendingThumb().collect { media ->
+    mediaRepository.unsyncedThumb().collect { media ->
         // TODO probably need a loop any only return when null or markAsThumbSynced, otherwise no retry
         if (media == null) {
             log.w { "out of work" }
@@ -57,6 +68,8 @@ suspend fun syncThumbnails(
                 return@collect
             }
 
+            // NOTE: since we're not duplicating the android media-store cache in appdata,
+            //       we're constantly re-"generating" thumbnails, but Android should cache
             val bitmap: Bitmap? = getThumbBitmap(media.mediaType, media.path)
             if (bitmap == null) {
                 // TODO just throw
@@ -74,7 +87,7 @@ suspend fun syncThumbnails(
             bitmap.recycle()
             val inputStream = ByteArrayInputStream(bitmapData)
 
-            if (!mediaRepository.uploadData(media, false, inputStream)) {
+            if (!mediaRepository.uploadData(media, false, inputStream, bitmapData.size.toLong())) {
                 log.i { "failed to upload thumb, standby..." }
                 delay(25.seconds)
                 // update retry counter on file to trigger collect
@@ -93,8 +106,12 @@ suspend fun syncThumbnails(
             log.i { "marked as generated: $file" }*/
             delay(100.milliseconds)
         } catch (e: Throwable) {
+            if (e is CancellationException) throw e
             // TODO ensure this is never called by uploadThumb (should by fine)
-            log.e(e) { "generation failed: $media" }
+            // TODO / NOTE: worker cancellation can cancel the thumb generation
+            //              "generation failed: JobCancellationException"
+            //              -> `is CancellationException`, alt: only update retry counter
+            log.e(e) { "generation failed: $media - increasing retry counter without setting a bad mark" }
             mediaRepository.markAsThumbGenerationFailed(media)
         }
     }
@@ -330,6 +347,34 @@ actual fun getThumbPath(appDirs: AppDirs, mediaId: UUID): File {
     val thumbsDir = File(appDirs.getUserDataDir(), "thumbs")
     val thumb = File(thumbsDir, mediaId.toString())
     return thumb
+}
+
+@SingleIn(AppScope::class)
+@Inject
+actual class PlatformIO(
+    @AppContext val context: Context
+) {
+    actual fun shareFile(uriHandler: UriHandler, path: String) {
+        val file = File(path)
+        val fileShareUri = FileProvider.getUriForFile(
+            context, context.applicationContext.packageName + ".provider", file
+        )
+
+        val mime = MimeTypeMap.getSingleton()
+        val ext = file.extension
+        val type = mime.getMimeTypeFromExtension(ext)
+        if (type == null) {
+            Log.e("PlatformIO", "failed to get mime type: $file ($ext)")
+            return
+        }
+
+        //fileShareUri.path?.let { uriHandler.openUri(it) }
+        val intent = Intent(Intent.ACTION_VIEW)
+        intent.setDataAndType(fileShareUri, "text/*")
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        context.startActivity(intent)
+    }
 }
 
 data class Folder(

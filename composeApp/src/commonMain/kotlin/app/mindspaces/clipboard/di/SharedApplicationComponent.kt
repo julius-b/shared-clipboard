@@ -1,6 +1,7 @@
 package app.mindspaces.clipboard.di
 
 import app.mindspaces.clipboard.api.newHttpClient
+import app.mindspaces.clipboard.data.PlatformIO
 import app.mindspaces.clipboard.db.Database
 import app.mindspaces.clipboard.db.DriverFactory
 import app.mindspaces.clipboard.db.cleanup
@@ -35,6 +36,7 @@ interface SharedApplicationComponent {
 
     // NOTE: SiteData not user-accessible on Linux
     val appDirs: AppDirs
+    val platformIO: PlatformIO
 
     @Provides
     @SingleIn(AppScope::class)

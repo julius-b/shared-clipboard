@@ -212,6 +212,7 @@ curl -d '{"has_file":"true"}' -H "Authorization: Bearer $access_token" -H "Conte
 ```
 
 ## TODO
+- access clipboard on selected devices using root (not available on GrapheneOS), accessibility service, device admin (both won't be allowed in play store)
 - thymeleaf & htmx web client vs wasmJS web client
 - end-to-end encryption using Noise
 - password hashing (preferably argon2id)

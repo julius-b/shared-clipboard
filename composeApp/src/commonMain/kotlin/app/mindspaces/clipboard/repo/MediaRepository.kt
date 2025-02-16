@@ -5,6 +5,7 @@ import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
 import app.mindspaces.clipboard.api.ApiDataNotification.Target
+import app.mindspaces.clipboard.api.ApiErrorResponse
 import app.mindspaces.clipboard.api.ApiInstallation
 import app.mindspaces.clipboard.api.ApiMedia
 import app.mindspaces.clipboard.api.ApiSuccessResponse
@@ -87,8 +88,11 @@ class MediaRepository(
             .mapToOneOrNull(Dispatchers.IO)
             .distinctUntilChanged()
 
+    // on desktop syncThumbnails (if implemented) might wait for ThumbState.Generated
+    // but on android, thumbnails are generated in the moment (-> upload Pending or Generated)
     fun unsyncedThumb() =
-        mediaQueries.byThumbState(ThumbState.Generated).asFlow().conflate()
+        mediaQueries.byThumbStates(listOf(ThumbState.Pending, ThumbState.Generated)).asFlow()
+            .conflate()
             .mapToOneOrNull(Dispatchers.IO)
             .distinctUntilChanged()
 
@@ -107,6 +111,10 @@ class MediaRepository(
 
     fun markAsThumbGenerationFailed(media: Media) {
         mediaQueries.markThumb(ThumbState.GenFailed, media.path, media.cre, media.mod, media.size)
+    }
+
+    fun resetThumbGenerationFailed() {
+        mediaQueries.resetThumbGenerationFailed(ThumbState.Pending, ThumbState.GenFailed)
     }
 
     fun saveLocal(path: String, mediaType: MediaType?, cre: Long?, mod: Long, size: Long): Media {
@@ -199,7 +207,12 @@ class MediaRepository(
         }
     }
 
-    suspend fun uploadData(media: Media, isFile: Boolean, reader: InputStream): Boolean {
+    suspend fun uploadData(
+        media: Media,
+        isFile: Boolean,
+        reader: InputStream,
+        size: Long
+    ): Boolean {
         // form field names are ignored by the server, only relevant for path
         val partName = if (isFile) "file" else "thumb"
         try {
@@ -211,6 +224,7 @@ class MediaRepository(
                     media.cre?.let { append("cre", it) }
                     append("mod", media.mod)
                     media.mediaType?.name?.let { append("media-type", it) }
+                    append("size", size)
                     // `InputProvider` adds Content-Length, actual file body
                     // file variant: `InputProvider(file.length()) { file.inputStream().asInput() }`
                     append(
@@ -235,6 +249,8 @@ class MediaRepository(
                     }
                 if (!resp.status.isSuccess()) {
                     log.e { "upload-data(stream,$partName) - failed: $resp" }
+                    val err = resp.body<ApiErrorResponse>()
+                    log.e { "upload-data(stream,$partName) - errors: $err" }
                     return false
                 }
                 log.i { "upload-data(stream,$partName) - success: ${media.id}" }
@@ -270,9 +286,10 @@ class MediaRepository(
                 }
 
                 log.i { "handle-requests - initiating upload for media-id: ${req.media_id}..." }
+                val file = File(media.path)
                 val inStream: InputStream
                 try {
-                    inStream = File(media.path).inputStream()
+                    inStream = file.inputStream()
                 } catch (e: Throwable) {
                     log.e { "handle-requests - path not found: ${media.path}, ignoring..." }
                     // TODO maybe inform client, mark media as deleted
@@ -282,7 +299,7 @@ class MediaRepository(
 
                 try {
                     // TODO save synced status...
-                    if (!uploadData(media, true, inStream)) {
+                    if (!uploadData(media, true, inStream, file.length())) {
                         // TODO what if too big for upload? don't loop
                         log.w { "handle-requests - upload failed, assuming temporary..." }
                         // TODO increase retry
@@ -357,6 +374,13 @@ class MediaRepository(
             log.i { "download-media($id) - saved: ${file.path}" }
         }
         return file.path
+    }
+
+    suspend fun monitor() {
+        mediaQueries.stats().asFlow().mapToList(Dispatchers.IO).distinctUntilChanged()
+            .collect { stats ->
+                log.i { "monitor - stats: $stats" }
+            }
     }
 
     fun localFile(path: String, cre: Long?, mod: Long, size: Long) =

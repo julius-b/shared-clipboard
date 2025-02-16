@@ -5,6 +5,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import app.mindspaces.clipboard.data.RealTimeClient
 import app.mindspaces.clipboard.data.listAllMedia
+import app.mindspaces.clipboard.data.syncThumbnails
 import app.mindspaces.clipboard.repo.AuthRepository
 import app.mindspaces.clipboard.repo.InstallationRepository
 import app.mindspaces.clipboard.repo.MediaRepository
@@ -46,7 +47,7 @@ class SyncWorker(
 
         launch {
             log.i { "stage 'sync thumbnails': launching..." }
-            //syncThumbnails(mediaRepository, applicationContext.contentResolver, appDirs)
+            syncThumbnails(mediaRepository, applicationContext.contentResolver, appDirs)
             log.i { "stage 'sync thumbnails': done" }
         }
 
@@ -67,6 +68,10 @@ class SyncWorker(
 
         launch {
             mediaRepository.handleMediaUpdates()
+        }
+
+        launch {
+            mediaRepository.monitor()
         }
 
         // never returns

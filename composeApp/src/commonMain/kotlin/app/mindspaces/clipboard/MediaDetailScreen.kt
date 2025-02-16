@@ -17,8 +17,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
 import app.mindspaces.clipboard.MediaDetailScreen.Event.Back
 import app.mindspaces.clipboard.MediaDetailScreen.Event.Share
+import app.mindspaces.clipboard.MediaDetailScreen.State
 import app.mindspaces.clipboard.api.MediaType
 import app.mindspaces.clipboard.components.SimpleScaffold
+import app.mindspaces.clipboard.data.PlatformIO
 import app.mindspaces.clipboard.data.fileName
 import app.mindspaces.clipboard.data.toFileModel
 import app.mindspaces.clipboard.db.Media
@@ -28,7 +30,6 @@ import chaintech.videoplayer.host.VideoPlayerHost
 import chaintech.videoplayer.ui.video.VideoPlayerComposable
 import co.touchlab.kermit.Logger
 import coil3.compose.AsyncImage
-import com.eygraber.uri.toUri
 import com.slack.circuit.codegen.annotations.CircuitInject
 import com.slack.circuit.retained.collectAsRetainedState
 import com.slack.circuit.retained.rememberRetained
@@ -45,7 +46,6 @@ import kotlinx.coroutines.withContext
 import me.tatarka.inject.annotations.Assisted
 import me.tatarka.inject.annotations.Inject
 import software.amazon.lastmile.kotlin.inject.anvil.AppScope
-import java.io.File
 import java.util.UUID
 
 @CommonParcelize
@@ -97,8 +97,9 @@ data class MediaDetailScreen(
 class MediaDetailPresenter(
     @Assisted private val screen: MediaDetailScreen,
     @Assisted private val navigator: Navigator,
-    private val mediaRepository: MediaRepository
-) : Presenter<MediaDetailScreen.State> {
+    private val mediaRepository: MediaRepository,
+    private val platformIO: PlatformIO
+) : Presenter<State> {
     private val log = Logger.withTag("MediaDetailScreen")
 
     init {
@@ -106,7 +107,7 @@ class MediaDetailPresenter(
     }
 
     @Composable
-    override fun present(): MediaDetailScreen.State {
+    override fun present(): State {
         val scope = rememberStableCoroutineScope()
         val uriHandler = LocalUriHandler.current
 
@@ -124,6 +125,10 @@ class MediaDetailPresenter(
             media?.let { m ->
                 if (m.mediaType != MediaType.Video) {
                     log.i { "not downloading media type: ${m.mediaType}" }
+                    return@LaunchedEffect
+                }
+                if (m.installation_id == null) {
+                    video = m.path
                     return@LaunchedEffect
                 }
                 scope.launch(Dispatchers.IO) {
@@ -152,36 +157,44 @@ class MediaDetailPresenter(
         fun onEvent(event: MediaDetailScreen.Event) {
             when (event) {
                 is Back -> navigator.pop()
-                is Share -> {
-                    uriHandler.openUri(event.path)
-                }
+                is Share -> platformIO.shareFile(uriHandler, event.path)
             }
         }
 
-        if (error) return MediaDetailScreen.State.Error(::onEvent)
+        if (error) return State.Error(::onEvent)
 
         return media?.let { m ->
             if (m.mediaType == MediaType.Video) {
                 return@let video?.let { v ->
-                    MediaDetailScreen.State.Video(m, v, ::onEvent)
-                } ?: MediaDetailScreen.State.Loading(percentage, ::onEvent)
+                    State.Video(m, v, ::onEvent)
+                } ?: State.Loading(percentage, ::onEvent)
             }
-            MediaDetailScreen.State.Image(m, ::onEvent)
-        } ?: MediaDetailScreen.State.Loading(percentage, ::onEvent)
+            State.Image(m, ::onEvent)
+        } ?: State.Loading(percentage, ::onEvent)
     }
 }
 
 @CircuitInject(MediaDetailScreen::class, AppScope::class)
 @Composable
-fun MediaDetailView(state: MediaDetailScreen.State, modifier: Modifier = Modifier) {
+fun MediaDetailView(state: State, modifier: Modifier = Modifier) {
     SimpleScaffold(modifier, state.title, onBack = {
         state.eventSink(Back)
     }, onAction = {
         // video: TODO open directory it is in, with file highlight
-        if (state is MediaDetailScreen.State.Video) {
-            // toUri creates real uri (file:// %20)
-            // modal: open in vs share, download on desktop and xdg-open
-            state.eventSink(Share(File(state.video).toUri().toString()))
+        when (state) {
+            is State.Video -> {
+                // toUri creates real uri (file:// %20)
+                // modal: open in vs share, download on desktop and xdg-open
+                state.eventSink(Share(state.video))
+            }
+
+            is State.Image -> {
+                // TODO download locally or share binary data from coil cache
+                if (state.media.installation_id == null)
+                    state.eventSink(Share(state.media.path))
+            }
+
+            else -> {}
         }
     }, actionIcon = {
         Icon(
@@ -190,16 +203,16 @@ fun MediaDetailView(state: MediaDetailScreen.State, modifier: Modifier = Modifie
         )
     }) {
         when (state) {
-            is MediaDetailScreen.State.Loading -> DetailLoadingView(state)
-            is MediaDetailScreen.State.Image -> DetailImageView(state)
-            is MediaDetailScreen.State.Video -> DetailVideoView(state)
-            is MediaDetailScreen.State.Error -> DetailErrorView(state)
+            is State.Loading -> DetailLoadingView(state)
+            is State.Image -> DetailImageView(state)
+            is State.Video -> DetailVideoView(state)
+            is State.Error -> DetailErrorView(state)
         }
     }
 }
 
 @Composable
-fun DetailVideoView(state: MediaDetailScreen.State.Video) {
+fun DetailVideoView(state: State.Video) {
     val playerHost = remember {
         VideoPlayerHost(
             url = state.video
@@ -213,7 +226,7 @@ fun DetailVideoView(state: MediaDetailScreen.State.Video) {
 }
 
 @Composable
-fun ColumnScope.DetailImageView(state: MediaDetailScreen.State.Image) {
+fun ColumnScope.DetailImageView(state: State.Image) {
     AsyncImage(
         modifier = Modifier.fillMaxSize(),
         model = state.media.toFileModel(),
@@ -223,12 +236,12 @@ fun ColumnScope.DetailImageView(state: MediaDetailScreen.State.Image) {
 }
 
 @Composable
-fun DetailLoadingView(state: MediaDetailScreen.State.Loading) {
+fun DetailLoadingView(state: State.Loading) {
     // TODO progress bar
     Text("Loading (${state.percentage}%)...")
 }
 
 @Composable
-fun DetailErrorView(state: MediaDetailScreen.State.Error) {
+fun DetailErrorView(state: State.Error) {
     Text("An error occurred while loading the media, please try again later.")
 }

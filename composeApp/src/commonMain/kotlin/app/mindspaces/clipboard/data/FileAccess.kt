@@ -1,5 +1,6 @@
 package app.mindspaces.clipboard.data
 
+import androidx.compose.ui.platform.UriHandler
 import app.mindspaces.clipboard.repo.MediaRepository
 import ca.gosyer.appdirs.AppDirs
 import co.touchlab.kermit.Logger
@@ -92,3 +93,7 @@ expect suspend fun getThumbBitmap(appDirs: AppDirs, media: MediaFetcherModel): B
 
 // TODO performance on large files?
 expect suspend fun getFileBitmap(media: MediaFetcherModel): BitmapImage?
+
+expect class PlatformIO {
+    fun shareFile(uriHandler: UriHandler, path: String)
+}

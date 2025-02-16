@@ -63,6 +63,9 @@ class InstallationRepository(db: Database, private val client: HttpClient) {
             if (installationRes !is RepoResult.Data) {
                 log.e { "req '${req.method} ${req.url}': failed to sync installation" }
                 // simply caught as Throwable and treated like other NetworkErrors
+                // NOTE: KtorNetworkFetcherFactory can't handle the exceptions (app crash)
+                //       shouldn't be a problem since installation is always available when
+                //       media from other installations is to be downloaded
                 throw IllegalStateException("failed to sync installation")
                 //return@intercept execute(req).apply {
                 //    attributes.put(InstallationPutFailed, Unit)

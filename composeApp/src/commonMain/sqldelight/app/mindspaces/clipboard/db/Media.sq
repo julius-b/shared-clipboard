@@ -87,9 +87,11 @@ SELECT * FROM media WHERE (thumbState = ? OR thumbState = ?) ORDER BY mod DESC L
 recentsNotFailed:
 SELECT * FROM media WHERE thumbState <> ? ORDER BY mod DESC LIMIT 16;
 
--- TODO pendingThumb, unsyncedThumb - with thumb_state = ThumbState.<>
 byThumbState:
 SELECT * FROM media WHERE installation_id IS NULL AND thumbState = ? ORDER BY mod DESC LIMIT 1;
+
+byThumbStates:
+SELECT * FROM media WHERE installation_id IS NULL AND thumbState IN ? ORDER BY mod DESC LIMIT 1;
 
 -- TODO by media_id should be fine
 increaseThumbRetry:
@@ -97,6 +99,12 @@ UPDATE media SET thumbRetryCount = thumbRetryCount + 1 WHERE installation_id IS 
 
 resetThumbRetryCounter:
 UPDATE media SET thumbRetryCount = 0 WHERE installation_id IS NULL AND path = ? AND cre = ? AND mod = ? AND size = ?;
+
+resetThumbGenerationFailed:
+UPDATE media SET thumbState = ? WHERE thumbState = ? AND installation_id IS NULL;
+
+stats:
+SELECT thumbState, count(thumbState) FROM media WHERE installation_id IS NULL GROUP BY thumbState;
 
 -- TODO default for enum
 --insert:

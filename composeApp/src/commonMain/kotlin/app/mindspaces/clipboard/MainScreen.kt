@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -211,8 +210,11 @@ class MainPresenter(
                 is AddAccount -> navigator.goTo(AuthScreen)
                 is RequestStoragePermission -> storagePermission.launchPermissionRequest()
                 is ViewSettings -> navigator.goTo(SettingsScreen)
-                is ViewAllMedias -> navigator.goTo(MediaScreen())
                 is ViewAllDevices -> navigator.goTo(DeviceScreen)
+                is ViewAllMedias -> {
+                    if (storagePermission.status.isGranted)
+                        navigator.goTo(MediaScreen())
+                }
             }
         }
     }
