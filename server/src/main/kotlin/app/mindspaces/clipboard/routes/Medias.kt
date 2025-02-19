@@ -95,14 +95,13 @@ fun Route.mediasApi() {
             try {
                 val maxFileSize =
                     if (type == UploadType.Thumb) ThumbMaxSize else FileMaxSize
-                // TODO client inputstream (for thumb) does not include content-length
-                /*val contentLength =
+                val contentLength =
                     call.request.header(HttpHeaders.ContentLength)?.toDouble()
                         ?: throw ValidationException(HttpHeaders.ContentLength, ApiError.Required())
                 if (contentLength > maxFileSize) throw ValidationException(
                     HttpHeaders.ContentLength,
                     ApiError.Constraint("$contentLength", max = maxFileSize)
-                )*/
+                )
 
                 // should query current hasFile/Thumb state after acquiring lock
                 if (file.exists()) {
@@ -162,10 +161,15 @@ fun Route.mediasApi() {
                         }
 
                         is PartData.FileItem -> {
+                            if (fileSize != null) {
+                                log.error("received more than one file-item, aborting...")
+                                throw ValidationException("file", ApiError.Constraint(max = 1))
+                            }
                             val formFieldName = part.name
                             val formFileName = part.originalFileName
                             log.info("receiving file-item - type: $type, mediaId: $mediaId, form(field-name: '$formFieldName', file-name: '$formFileName')")
 
+                            // TODO read limit until Content-Size, if there's more -> Cancel
                             part.provider().toInputStream().use { inStream ->
                                 file.outputStream().buffered().use { outStream ->
                                     inStream.copyTo(outStream)

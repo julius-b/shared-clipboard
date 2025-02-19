@@ -19,8 +19,6 @@ class ClipboardApplication : Application(), Configuration.Provider, SingletonIma
     init {
         // TODO possible race with component lazy access?
         attachAppDirs()
-        // force init InstallationRepo, it doesn't happen otherwise
-        println("init: ${component.installationRepository}")
     }
 
     override val workManagerConfiguration: Configuration

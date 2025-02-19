@@ -8,7 +8,6 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import app.mindspaces.clipboard.data.RealTimeClient
 import app.mindspaces.clipboard.data.generateThumbnails
-import app.mindspaces.clipboard.data.traverseFiles
 import app.mindspaces.clipboard.di.DesktopApplicationComponent
 import app.mindspaces.clipboard.di.create
 import coil3.SingletonImageLoader
@@ -21,9 +20,6 @@ fun main() = application {
     //val app = remember { DesktopApplicationComponent::class.create() }
     val component = remember { DesktopApplicationComponent.create() }
     SingletonImageLoader.setSafe { component.imageLoader }
-
-    // force init InstallationRepo, it doesn't happen otherwise
-    println("init: ${component.installationRepository}")
 
     Window(
         onCloseRequest = ::exitApplication,
@@ -61,13 +57,14 @@ fun main() = application {
             }
 
             scope.launch(Dispatchers.IO) {
-                // TODO also consider user.home, drive roots, etc.
+                // TODO also consider drive roots, etc.
                 // TODO allow user to pick more roots
-                traverseFiles(
-                    File("/home/init/Pictures/nonpol/"),
-                    component.mediaRepository,
-                    component.appDirs
-                )
+                // NOTE: for now desktop is not supported (blocking: windows paths to "unix-y" paths)
+                val homeDir = File(System.getProperty("user.home"))
+                println("home-dir: $homeDir")
+                //traverseFiles(
+                //    File(homeDir, "Pictures"), component.mediaRepository, component.appDirs
+                //)
             }
 
             scope.launch(Dispatchers.IO) {

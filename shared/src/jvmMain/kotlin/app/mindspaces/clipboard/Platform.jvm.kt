@@ -9,6 +9,7 @@ actual fun getPlatform(): Platform {
         os.contains("win") -> Platform.Windows
         os.contains("nix") || os.contains("nux") || os.contains("aix") -> Platform.Linux
         os.contains("mac") -> Platform.MacOS
+        // idea: if File.separatorChar == '/' -> Platform.Unix
         else -> Platform.Desktop
     }
 }

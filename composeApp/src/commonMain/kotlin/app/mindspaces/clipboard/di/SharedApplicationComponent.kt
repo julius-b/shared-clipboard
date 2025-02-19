@@ -1,5 +1,6 @@
 package app.mindspaces.clipboard.di
 
+import app.mindspaces.clipboard.ClipboardApp
 import app.mindspaces.clipboard.api.newHttpClient
 import app.mindspaces.clipboard.data.PlatformIO
 import app.mindspaces.clipboard.db.Database
@@ -22,6 +23,7 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 
 @SingleIn(AppScope::class)
 interface SharedApplicationComponent {
+    val driverFactory: DriverFactory
     val db: Database
 
     val httpClient: HttpClient
@@ -37,6 +39,7 @@ interface SharedApplicationComponent {
     // NOTE: SiteData not user-accessible on Linux
     val appDirs: AppDirs
     val platformIO: PlatformIO
+    val clipboardApp: ClipboardApp
 
     @Provides
     @SingleIn(AppScope::class)
@@ -52,11 +55,7 @@ interface SharedApplicationComponent {
 
     @Provides
     @SingleIn(AppScope::class)
-    fun provideDatabase() = createDatabase(getDriverFactory())
-
-    @Provides
-    @SingleIn(AppScope::class)
-    fun getDriverFactory(): DriverFactory
+    fun provideDatabase() = createDatabase(driverFactory)
 
     @Provides
     @SingleIn(AppScope::class)

@@ -41,7 +41,6 @@ import app.mindspaces.clipboard.MediaScreen.Event.Back
 import app.mindspaces.clipboard.MediaScreen.Event.MediaClicked
 import app.mindspaces.clipboard.MediaScreen.Event.ToggleDevice
 import app.mindspaces.clipboard.components.SimpleScaffold
-import app.mindspaces.clipboard.data.fileName
 import app.mindspaces.clipboard.data.toThumbModel
 import app.mindspaces.clipboard.db.AllLinks
 import app.mindspaces.clipboard.db.Media
@@ -49,6 +48,7 @@ import app.mindspaces.clipboard.parcel.CommonParcelable
 import app.mindspaces.clipboard.parcel.CommonParcelize
 import app.mindspaces.clipboard.repo.InstallationRepository
 import app.mindspaces.clipboard.repo.MediaRepository
+import app.mindspaces.clipboard.utils.mediaName
 import co.touchlab.kermit.Logger
 import coil3.compose.AsyncImage
 import com.slack.circuit.codegen.annotations.CircuitInject
@@ -137,8 +137,8 @@ class MediaPresenter(
                 withContext(IO) {
                     medias.map {
                         val name =
-                            if (screen.dir == null) it.dir.fileName()
-                            else it.path.fileName()
+                            if (screen.dir == null) it.dir.mediaName
+                            else it.path.mediaName
 
                         DisplayMedia(it, name)
                     }

@@ -60,9 +60,8 @@ suspend fun generateThumbnails(mediaRepository: MediaRepository, appDirs: AppDir
         }
 
         try {
-            val thumbsDir = File(appDirs.getUserDataDir(), "thumbs")
-            thumbsDir.mkdirs()
-            val thumb = File(thumbsDir, file.id.toString())
+            val thumb = getThumbPath(appDirs, file.id)
+            thumb.parentFile.mkdirs()
 
             log.i { "generating thumb: ${file.path}..." }
             // library always adds extension
@@ -84,9 +83,6 @@ suspend fun generateThumbnails(mediaRepository: MediaRepository, appDirs: AppDir
     }
 }
 
-// TODO cross platform
-fun String.fileName() = this.substringAfterLast('/')
-
 expect fun getThumbPath(appDirs: AppDirs, mediaId: UUID): File
 
 expect suspend fun getThumbBitmap(appDirs: AppDirs, media: MediaFetcherModel): BitmapImage?
@@ -95,5 +91,8 @@ expect suspend fun getThumbBitmap(appDirs: AppDirs, media: MediaFetcherModel): B
 expect suspend fun getFileBitmap(media: MediaFetcherModel): BitmapImage?
 
 expect class PlatformIO {
+    /**
+     * @param[path] must be a local path
+     */
     fun shareFile(uriHandler: UriHandler, path: String)
 }

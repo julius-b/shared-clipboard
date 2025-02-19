@@ -332,7 +332,7 @@ fun DeviceCard(
             if (device.self) {
                 Text(
                     "This device",
-                    style = MaterialTheme.typography.titleSmall
+                    style = MaterialTheme.typography.bodySmall
                 )
             }
         }

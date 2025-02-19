@@ -17,6 +17,7 @@ import java.io.File
 import java.util.UUID
 import javax.imageio.ImageIO
 
+// desktop thumbnail is always jpg
 actual fun getThumbPath(appDirs: AppDirs, mediaId: UUID): File {
     val thumbsDir = File(appDirs.getUserDataDir(), "thumbs")
     val thumb = File(thumbsDir, "${mediaId}.jpg")

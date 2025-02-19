@@ -3,7 +3,12 @@ package app.mindspaces.clipboard.db
 import app.cash.sqldelight.db.SqlDriver
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import co.touchlab.kermit.Logger
+import me.tatarka.inject.annotations.Inject
+import software.amazon.lastmile.kotlin.inject.anvil.AppScope
+import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 
+@SingleIn(AppScope::class)
+@Inject
 actual class DriverFactory {
     private val log = Logger.withTag("DriverFactory")
 

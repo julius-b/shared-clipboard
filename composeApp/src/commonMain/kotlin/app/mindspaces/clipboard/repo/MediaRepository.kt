@@ -225,11 +225,11 @@ class MediaRepository(
                     append("mod", media.mod)
                     media.mediaType?.name?.let { append("media-type", it) }
                     append("size", size)
-                    // `InputProvider` adds Content-Length, actual file body
+                    // `InputProvider` adds Content-Length for some streams
                     // file variant: `InputProvider(file.length()) { file.inputStream().asInput() }`
                     append(
                         partName,
-                        InputProvider { handledReader.asInput() },
+                        InputProvider(size) { handledReader.asInput() },
                         Headers.build {
                             // TODO form-data; dup in body
                             append(

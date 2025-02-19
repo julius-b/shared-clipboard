@@ -21,11 +21,11 @@ import app.mindspaces.clipboard.MediaDetailScreen.State
 import app.mindspaces.clipboard.api.MediaType
 import app.mindspaces.clipboard.components.SimpleScaffold
 import app.mindspaces.clipboard.data.PlatformIO
-import app.mindspaces.clipboard.data.fileName
 import app.mindspaces.clipboard.data.toFileModel
 import app.mindspaces.clipboard.db.Media
 import app.mindspaces.clipboard.parcel.CommonParcelize
 import app.mindspaces.clipboard.repo.MediaRepository
+import app.mindspaces.clipboard.utils.mediaName
 import chaintech.videoplayer.host.VideoPlayerHost
 import chaintech.videoplayer.ui.video.VideoPlayerComposable
 import co.touchlab.kermit.Logger
@@ -58,6 +58,8 @@ data class MediaDetailScreen(
 
         // loading type: requesting from client, waiting for client upload, downloading from server
         data class Loading(
+            // whether file is available on server
+            val synced: Boolean?,
             val percentage: Int?,
             override val eventSink: (Event) -> Unit
         ) : State {
@@ -68,7 +70,7 @@ data class MediaDetailScreen(
             val media: Media,
             override val eventSink: (Event) -> Unit
         ) : State {
-            override val title = media.path.fileName()
+            override val title = media.path.mediaName
         }
 
         data class Video(
@@ -76,7 +78,7 @@ data class MediaDetailScreen(
             val video: String,
             override val eventSink: (Event) -> Unit
         ) : State {
-            override val title = media.path.fileName()
+            override val title = media.path.mediaName
         }
 
         data class Error(
@@ -164,13 +166,20 @@ class MediaDetailPresenter(
         if (error) return State.Error(::onEvent)
 
         return media?.let { m ->
+            // TODO if m.hasFile == false -> state "NoData" (UI: button to request, see if origin device is online)
+            //      - if request is already stored server-side: show "waiting for device to come online" (or instruct to open app on origin device)
+            //      - sharing origin device upload progress? server doesn't currently track this, but would also be useful for general monitoring
+            if (m.installation_id != null && !m.synced) {
+                // TODO show "request file" button
+                return@let State.Loading(false, null, ::onEvent)
+            }
             if (m.mediaType == MediaType.Video) {
                 return@let video?.let { v ->
                     State.Video(m, v, ::onEvent)
-                } ?: State.Loading(percentage, ::onEvent)
+                } ?: State.Loading(m.synced, percentage, ::onEvent)
             }
             State.Image(m, ::onEvent)
-        } ?: State.Loading(percentage, ::onEvent)
+        } ?: State.Loading(null, null, ::onEvent)
     }
 }
 
@@ -180,7 +189,7 @@ fun MediaDetailView(state: State, modifier: Modifier = Modifier) {
     SimpleScaffold(modifier, state.title, onBack = {
         state.eventSink(Back)
     }, onAction = {
-        // video: TODO open directory it is in, with file highlight
+        // TODO (desktop) open directory media is in, with file highlight
         when (state) {
             is State.Video -> {
                 // toUri creates real uri (file:// %20)
@@ -189,7 +198,7 @@ fun MediaDetailView(state: State, modifier: Modifier = Modifier) {
             }
 
             is State.Image -> {
-                // TODO download locally or share binary data from coil cache
+                // TODO download locally (save with extension) or share binary data from coil cache
                 if (state.media.installation_id == null)
                     state.eventSink(Share(state.media.path))
             }
@@ -219,6 +228,7 @@ fun DetailVideoView(state: State.Video) {
         )
     }
 
+    // TODO handle correct rotation
     VideoPlayerComposable(
         modifier = Modifier.fillMaxSize(),
         playerHost = playerHost

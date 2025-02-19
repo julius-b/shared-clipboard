@@ -361,39 +361,17 @@ actual class PlatformIO(
         )
 
         val mime = MimeTypeMap.getSingleton()
-        val ext = file.extension
+        val ext = file.extension.lowercase()
         val type = mime.getMimeTypeFromExtension(ext)
-        if (type == null) {
-            Log.e("PlatformIO", "failed to get mime type: $file ($ext)")
-            return
-        }
+        Log.i("PlatformIO", "mime type: $type ($file/$ext)")
 
         //fileShareUri.path?.let { uriHandler.openUri(it) }
         val intent = Intent(Intent.ACTION_VIEW)
-        intent.setDataAndType(fileShareUri, "text/*")
+        // OS can usually determine type on its own
+        //type?.let { intent.setType(type) }
+        intent.setData(fileShareUri)
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         context.startActivity(intent)
     }
 }
-
-data class Folder(
-    val uri: String,
-    val id: Long,
-    val name: String,
-    val displayName: String,
-    val size: String,
-    val duration: String,
-    val path: String,
-    val dateAdded: String
-)
-
-data class Video(
-    val uri: String,
-    val name: String,
-    val duration: String,
-    val id: Long,
-    val path: String,
-    val size: String,
-    val dateAdded: String
-)
